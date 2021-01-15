@@ -338,7 +338,8 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 					$tdLoad.append(
 						createButton('load', 'ui-close', L10n.get('savesLabelLoad'), i, slot => {
 							jQuery(document).one(':dialogclosed', () => Save.slots.load(slot));
-						})
+						}),
+						createButton('save', 'ui-close', L10n.get('savesLabelSave'), i, Save.slots.save)
 					);
 
 					// Add the description (title and datestamp).

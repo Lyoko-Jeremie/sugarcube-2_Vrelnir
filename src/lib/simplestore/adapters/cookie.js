@@ -244,11 +244,13 @@ SimpleStore.adapters.push((() => {
 		}
 
 		static _serialize(obj) {
-			return LZString.compressToBase64(JSON.stringify(obj));
+			// return LZString.compressToBase64(JSON.stringify(obj)); // TODO keep LZString a config option?
+			return JSON.stringify(obj);
 		}
 
 		static _deserialize(str) {
-			return JSON.parse(LZString.decompressFromBase64(str));
+			// return JSON.parse(LZString.decompressFromBase64(str));
+			return JSON.parse(str);
 		}
 	}
 

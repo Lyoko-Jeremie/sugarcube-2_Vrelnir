@@ -451,7 +451,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		*/
 		if (Config.history.maxStates > 0) {
 			while (historySize() > Config.history.maxStates) {
-				_expired.push(_history.shift().title);
+				// _expired.push(_history.shift().title); // TODO make 'maintain State.expired' an option?
+				_history.shift();
 			}
 		}
 
