@@ -2,7 +2,7 @@
 
 	l10n/strings.js
 
-	Copyright © 2013–2020 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
+	Copyright © 2013–2021 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
@@ -32,6 +32,7 @@ var l10nStrings = { // eslint-disable-line no-unused-vars, no-var
 	errorTitle              : 'Error',
 	errorToggle             : 'Toggle the error view',
 	errorNonexistentPassage : 'the passage "{passage}" does not exist', // NOTE: `passage` is supplied locally
+	errorSaveDiskLoadFailed : 'failed to load save file from disk',
 	errorSaveMissingData    : 'save is missing required data. Either the loaded file is not a save or the save has become corrupted',
 	errorSaveIdMismatch     : 'save is from the wrong {identity}',
 

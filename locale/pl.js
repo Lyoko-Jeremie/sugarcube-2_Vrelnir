@@ -28,6 +28,9 @@
 	field is appreciated.
 
 ***********************************************************************************************************************/
+/* global l10nStrings */
+/* eslint-disable strict */
+
 (function () {
 	/* General. */
 	// BUG: Polish has cases, so one noun in the nominative won’t cut it.

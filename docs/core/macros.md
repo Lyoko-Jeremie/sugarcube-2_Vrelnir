@@ -287,7 +287,7 @@ The predefined variable <code>output</code>, which is a reference to a local con
 
 ### `<<= expression>>` {#macros-macro-equal}
 
-Outputs the result of the given expression.  This macro is an alias for [`<<print>>`](#macros-macro-print).
+Outputs a string representation of the result of the given expression.  This macro is an alias for [`<<print>>`](#macros-macro-print).
 
 <p role="note" class="tip"><b>Tip:</b>
 If you only need to print the value of a TwineScript variable, then you may simply include it in your normal passage text and it will be printed automatically via the <a href="#markup-naked-variable">naked variable markup</a>.
@@ -315,7 +315,7 @@ You weigh <<= $weight.toFixed(2)>> kg.  → Outputs: You weigh 74.65 kg.
 
 ### `<<- expression>>` {#macros-macro-hyphen}
 
-Outputs the result of the given expression.  This macro is functionally identical to [`<<print>>`](#macros-macro-print), save that it also encodes HTML special characters in the output.
+Outputs a string representation of the result of the given expression.  This macro is functionally identical to [`<<print>>`](#macros-macro-print), save that it also encodes HTML special characters in the output.
 
 <p role="note" class="tip"><b>Tip:</b>
 If you only need to print the value of a TwineScript variable, then you may simply include it in your normal passage text and it will be printed automatically via the <a href="#markup-naked-variable">naked variable markup</a>.
@@ -403,7 +403,7 @@ cherry
 
 ### `<<print expression>>` {#macros-macro-print}
 
-Outputs the result of the given expression.
+Outputs a string representation of the result of the given expression.
 
 <p role="note" class="tip"><b>Tip:</b>
 If you only need to print the value of a TwineScript variable, then you may simply include it in your normal passage text and it will be printed automatically via the <a href="#markup-naked-variable">naked variable markup</a>.
@@ -987,7 +987,7 @@ Interactive macros are both asynchronous and require interaction from the player
 
 ### `<<button linkText [passageName]>> … <</button>>`<br>`<<button linkMarkup>> … <</button>>`<br>`<<button imageMarkup>> … <</button>>` {#macros-macro-button}
 
-Creates a button that silently executes its contents when clicked, optionally forwarding the player to another passage.  May be called either with the link text and passage name as separate arguments, with a link markup, or with an image markup.
+Creates a button that silently executes its contents when clicked, optionally forwarding the player to another passage.  May be called with either the link text and passage name as separate arguments, a link markup, or an image markup.
 
 <p role="note" class="see"><b>See:</b>
 <a href="#macros-interactive-warning">Interactive macro warning</a>.
@@ -1093,7 +1093,7 @@ What pies do you enjoy?
 
 <!-- *********************************************************************** -->
 
-### `<<cycle receiverName [autoselect]>>`<br><span class="child">`[<<option label [value [selected]]>> …]`<br>`[<<optionsfrom collection>> …]`</span><br>`<</cycle>>` {#macros-macro-cycle}
+### `<<cycle receiverName [once] [autoselect]>>`<br><span class="child">`[<<option label [value [selected]]>> …]`<br>`[<<optionsfrom collection>> …]`</span><br>`<</cycle>>` {#macros-macro-cycle}
 
 Creates a cycling link, used to modify the value of the variable with the given name.  The cycling options are populated via `<<option>>` and/or `<<optionsfrom>>`.
 
@@ -1104,12 +1104,14 @@ Creates a cycling link, used to modify the value of the variable with the given 
 #### History:
 
 * `v2.29.0`: Introduced.
+* `v2.36.0`: Fixed the `selected` keyword and added the `once` keyword.
 
 #### Arguments:
 
 ##### `<<cycle>>`
 
 * **`receiverName`:** The name of the variable to modify, which *must* be quoted—e.g., `"$foo"`.  Object and array property references are also supported—e.g., `"$foo.bar"`, `"$foo['bar']"`, & `"$foo[0]"`.
+* **`once`:** (optional) Keyword, used to signify that the cycle should stop upon reaching the last option and deactivate itself.  **NOTE:** Since you likely want to start at the first option when using this keyword, you should either not select an option, so it defaults to the first, or, if you do, select the first option only.
 * **`autoselect`:** (optional) Keyword, used to signify that an option should be automatically selected as the cycle default based on the current value of the receiver variable.  **NOTE:** Automatic option selection will fail on non-primitive values—i.e., on arrays and objects.
 
 ##### `<<option>>`
@@ -1177,11 +1179,23 @@ What's your favorite pie?
 <</cycle>>
 ```
 
+##### Using the `once` keyword
+
+```
+You see a large red, candy-like button.
+<<cycle "$presses" once>>
+	<<option "Should you press it?" 0>>
+	<<option "Nothing happened.  Press it again?" 1>>
+	<<option "Again?" 2>>
+	<<option "That time it locked into place with a loud click and began to glow ominously." 3>>
+<</cycle>>
+```
+
 <!-- *********************************************************************** -->
 
 ### `<<link linkText [passageName]>> … <</link>>`<br>`<<link linkMarkup>> … <</link>>`<br>`<<link imageMarkup>> … <</link>>` {#macros-macro-link}
 
-Creates a link that silently executes its contents when clicked, optionally forwarding the player to another passage.  May be called either with the link text and passage name as separate arguments, with a link markup, or with an image markup.
+Creates a link that silently executes its contents when clicked, optionally forwarding the player to another passage.  May be called with either the link text and passage name as separate arguments, a link markup, or an image markup.
 
 <p role="note" class="see"><b>See:</b>
 <a href="#macros-interactive-warning">Interactive macro warning</a>.
@@ -1331,6 +1345,7 @@ Creates a listbox, used to modify the value of the variable with the given name.
 * `v2.28.0`: <s>Added `<<optionsFrom>>` child tag.</s>
 * `v2.28.1`: Fixed name of `<<optionsfrom>>` child tag, which was erroneously added as `<<optionsFrom>>` in `v2.28.0`.
 * `v2.29.0`: Made the `<<option>>` child tag's `value` argument optional.
+* `v2.36.0`: Fixed the `selected` keyword.
 
 #### Arguments:
 
@@ -1818,7 +1833,7 @@ The versions that forward to a specific passage are largely unnecessary, as you 
 
 <span id="macros-dom-warning"></span>
 <p role="note" class="warning"><b>Warning:</b>
-All DOM macros require the elements to be manipulated to be on the page.  As a consequence, you cannot use them directly within a passage to modify elements within said passage, since the elements they are targeting are still rendering, thus not yet on the page.  You must, generally, use them with a interactive macro—e.g., <a href="#macros-macro-link"><code>&lt;&lt;link&gt;&gt;</code> macro</a>—or within the <a href="#special-passage-passagedone"><code>PassageDone</code> special passage</a>.  Elements that are already part of the page, on the other hand, present no issues.
+All DOM macros require the elements to be manipulated to be on the page.  As a consequence, you cannot use them directly within a passage to modify elements within said passage, since the elements they are targeting are still rendering, thus not yet on the page.  You must, generally, use them with an interactive macro—e.g., <a href="#macros-macro-link"><code>&lt;&lt;link&gt;&gt;</code> macro</a>—the <a href="#macros-macro-done"><code>&lt;&lt;done&gt;&gt;</code> macro</a>, or within the <a href="#special-passage-passagedone"><code>PassageDone</code> special passage</a>.  Elements that are already part of the page, on the other hand, present no issues.
 </p>
 
 <!-- *********************************************************************** -->
@@ -2728,12 +2743,43 @@ This macro has been deprecated and should no longer be used.  See the <a href="#
 
 <!-- *********************************************************************** -->
 
+### `<<done>> … <</done>>` {#macros-macro-done}
+
+Silently executes its contents when the incoming passage is done rendering and has been added to the page.  Generally, only really useful for running code that needs to manipulate elements from the incoming passage, since you must wait until they've been added to the page.
+
+<p role="note" class="tip"><b>Tip:</b>
+If you need to run the same code on multiple passages, consider using the <a href="#special-passage-passagedone"><code>PassageDone</code> special passage</a> or, for a JavaScript/TwineScript solution, a <a href="#events-navigation-event-passagedisplay"><code>:passagedisplay</code> event</a> instead.  They serve the same basic purpose as the <code>&lt;&lt;done&gt;&gt;</code> macro, but are run each time passage navigation occurs.
+</p>
+
+#### History:
+
+* `v2.35.0`: Introduced.
+* `v2.36.0`: Changed delay mechanism to improve waiting on the DOM.
+
+#### Arguments: *none*
+
+#### Examples:
+
+```
+@@#spy;@@
+
+<<done>>
+	<<replace "#spy">>I spy with my little eye, a crab rangoon.<</replace>>
+<</done>>
+```
+
+<!-- *********************************************************************** -->
+
 ### `<<goto passageName>>`<br>`<<goto linkMarkup>>` {#macros-macro-goto}
 
 Immediately forwards the player to the passage with the given name.  May be called either with the passage name or with a link markup.
 
 <p role="note"><b>Note:</b>
 In most cases, you will not need to use <code>&lt;&lt;goto&gt;&gt;</code> as there are often better and easier ways to forward the player.  For example, a common use of <a href="#macros-macro-link"><code>&lt;&lt;link&gt;&gt;</code></a> is to perform various actions before forwarding the player to another passage.  In that case, unless you need to dynamically determine the destination passage within the <code>&lt;&lt;link&gt;&gt;</code> body, <code>&lt;&lt;goto&gt;&gt;</code> is unnecessary as <code>&lt;&lt;link&gt;&gt;</code> already includes the ability to forward the player.
+</p>
+
+<p role="note" class="warning"><b>Warning:</b>
+Using <code>&lt;&lt;goto&gt;&gt;</code> to automatically forward players from one passage to another with no input from them will both create junk moments within the story history and make it extremely difficult for players to navigate the history.  It is <strong><em>strongly</em></strong> recommended that you look into other methods to achieve your goals instead—e.g., <a href="#config-api-property-navigation-override"><code>Config.navigation.override</code></a>.
 </p>
 
 <p role="note" class="warning"><b>Warning:</b>
@@ -2891,45 +2937,90 @@ I'll have <span id="drink">some water</span>, please.\
 
 <!-- *********************************************************************** -->
 
-### `<<widget widgetName>> … <</widget>>` {#macros-macro-widget}
+### `<<widget widgetName [container]>> … <</widget>>` {#macros-macro-widget}
 
-Creates a new widget macro (henceforth, widget) with the given name.  Widgets allow you to create macros by using the standard macros and markup that you use normally within your story.  Widgets may access arguments passed to them via the `$args` array-like object—see below for details.
+Creates a new widget macro (henceforth, widget) with the given name.  Widgets allow you to create macros by using the standard macros and markup that you use normally within your story.  All widgets may access arguments passed to them via the `_args` special variable.  Block widgets may access the contents they enclose via the `_contents` special variable.
 
 <p role="note" class="warning"><b>Warning:</b>
 Widgets should <em>always</em> be defined within a <code>widget</code>-tagged passage—any widgets that are not may be lost on page reload—and you may use as few or as many such passages as you desire.  <em>Do not</em> add a <code>widget</code> tag to any of the <a href="#special-passages">specially named passages</a> and attempt to define your widgets there.
 </p>
 
 <p role="note" class="warning"><b>Warning:</b>
-The <code>$args</code> array-like object should be treated as though it were immutable—i.e., unable to be modified—because in the future it will be made thus, so any attempt to modify it will cause an error.
+The array-like object stored in the <code>_args</code> variable should be treated as though it were immutable—i.e., unable to be modified—because in the future it will be made thus, so any attempt to modify it will cause an error.
 </p>
 
 #### History:
 
 * `v2.0.0`: Introduced.
+* `v2.36.0`: Added the `container` keyword, `_args` variable, and `_contents` variable.  Deprecated the `$args` variable in favor of `_args`.
 
 #### Arguments:
 
 * **`widgetName`:** The name of the created widget, which should not contain whitespace or angle brackets (`<`, `>`).  If the name of an existing widget is chosen, the new widget will overwrite the older version.  **NOTE:** The names of existing macros are invalid widget names and any attempts to use such a name will cause an error.
+* **`container`:** (optional) Keyword, used to signify that the widget should be created as a container widget—i.e., non-void, requiring a closing tag; e.g., `<<foo>>…<</foo>>`.
 
-#### `$args` array-like object:
+#### Special variables, `_args` &amp; `_contents`:
 
-The `$args` variable is used internally to store arguments passed to the widget—as zero-based indices; i.e., `$args[0]` is the first parsed argument, `$args[1]` is the second, etc—and the full argument string in raw and parsed forms—accessed via the `$args.raw` and `$args.full` properties.
+The `_args` special variable is used internally to store arguments passed to the widget—as zero-based indices; i.e., `_args[0]` is the first parsed argument, `_args[1]` is the second, etc—and the full argument string in raw and parsed forms—accessed via the `_args.raw` and `_args.full` properties.
 
-When a widget is called, any existing `$args` variable is stored for the duration of the call and restored after.  This means that non-widget use of an `$args` variable is completely safe, though this does have the effect that an `$args` variable external to a widget is inaccessible to it unless passed in as an argument.
+The `_contents` special variable is used internally, by container widgets, to store the contents they enclose.
 
-Unless localized by use of the [`<<capture>>` macro](#macros-macro-capture), any story or temporary variables used within widgets are part of a story's normal variable store, so care *must be* taken not to accidentally either overwrite or pick up an existing value.
+When a widget is called, any existing `_args` variable, and for container widgets `_contents`, is stored for the duration of the call and restored after.  This means that non-widget uses of these special variable are completely safe, though this does have the effect that uses external to widgets are inaccessible within them unless passed in as arguments.
+
+<p role="note" class="warning"><b>Warning:</b>
+Unless localized by use of the <a href="#macros-macro-capture"><code>&lt;&lt;capture&gt;&gt;</code> macro</a>, any story or other temporary variables used within widgets are part of a story's normal variable store, so care <em>must be</em> taken not to accidentally either overwrite or pick up an existing value.
+</p>
 
 #### Examples:
 
+<p role="note"><b>Note:</b>
+No line-break control mechanisms are used in the following examples for readability.  In practice, you'll probably want to use either <a href="#markup-line-continuation">line continuations</a> or one of the no-break methods: <a href="#config-api-property-passages-nobr"><code>Config.passages.nobr</code> setting</a>, <a href="#special-tag-nobr"><code>nobr</code> special tag</a>, <a href="#macros-macro-nobr"><code>&lt;&lt;nobr&gt;&gt;</code> macro</a>.
+</p>
+
+##### Basic usage (non-container)
+
 ```
 → Creating a gender pronoun widget
-<<widget "he">><<if $pcSex eq "male">>he<<elseif $pcSex eq "female">>she<<else>>it<</if>><</widget>>
+<<widget "he">>
+	<<if $pcSex eq "male">>
+		he
+	<<elseif $pcSex eq "female">>
+		she
+	<<else>>
+		it
+	<</if>>
+<</widget>>
+
 → Using it
 "Are you sure that <<he>> can be trusted?"
+```
 
+```
 → Creating a silly print widget
-<<widget "pm">><<if $args[0]>><<print $args[0]>><<else>>Mum's the word!<</if>><</widget>>
+<<widget "pm">>
+	<<if _args[0]>>
+		<<print _args[0]>>
+	<<else>>
+		Mum's the word!
+	<</if>>
+<</widget>>
+
 → Using it
 <<pm>>        → Outputs: Mum's the word!
 <<pm "Hi!">>  → Outputs: Hi!
+```
+
+##### Basic usage (container)
+
+```
+→ Creating a simple dialog box widget
+<<widget "say" container>>
+	<div class="say-box">
+		<img class="say-image" @src="'images/' + _args[0].toLowerCase() + '.png'">
+		<p class="say-text">_contents</p>
+	</div>
+<</widget>>
+
+→ Using it
+<<say "Chapel">>Tweego is a pathway to many abilities some consider to be… unnatural.<</say>>
 ```

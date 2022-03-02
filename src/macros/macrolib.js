@@ -2,13 +2,13 @@
 
 	macros/macrolib.js
 
-	Copyright © 2013–2020 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
+	Copyright © 2013–2021 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
 /*
 	global Config, DebugView, Engine, Has, L10n, Macro, NodeTyper, Patterns, Scripting, SimpleAudio, State,
-	       Story, TempState, Util, Wikifier, postdisplay, prehistory, storage, toStringOrDefault
+	       Story, TempState, Util, Wikifier, postdisplay, prehistory, storage, stringFrom
 */
 
 (() => {
@@ -344,7 +344,7 @@
 			}
 
 			try {
-				const result = toStringOrDefault(Scripting.evalJavaScript(this.args.full), null);
+				const result = stringFrom(Scripting.evalJavaScript(this.args.full));
 
 				if (result !== null) {
 					new Wikifier(this.output, this.name === '-' ? Util.escape(result) : result);
@@ -631,10 +631,7 @@
 
 					// Set up the typing interval and start/stop event firing.
 					const typeNode = function typeNode() {
-						// Fire the typing start event.
-						$wrapper.trigger(typingStartId);
-
-						const typeNodeId = setInterval(() => {
+						const typeNodeMember = function typeNodeMember(typeIntervalId) {
 							// Stop typing if….
 							if (
 								// …we've navigated away.
@@ -644,8 +641,10 @@
 								// …we're done typing.
 								|| !typer.type()
 							) {
-								// Terminate the timer.
-								clearInterval(typeNodeId);
+								// Terminate the timer, if it exists.
+								if (typeIntervalId) {
+									clearInterval(typeIntervalId);
+								}
 
 								// Remove this handler from the queue, if the queue still exists and the
 								// handler IDs match.
@@ -668,7 +667,16 @@
 									$wrapper.addClass(`${className}-cursor`);
 								}
 							}
-						}, speed);
+						};
+
+						// Fire the typing start event.
+						$wrapper.trigger(typingStartId);
+
+						// Type the initial node member.
+						typeNodeMember();
+
+						// Set up the interval to continue typing.
+						const typeNodeMemberId = setInterval(() => typeNodeMember(typeNodeMemberId), speed);
 					};
 
 					// Kick off typing the node.
@@ -1228,6 +1236,8 @@
 						.attr('src', this.args[0].source)
 						.appendTo($link);
 
+					$link.addClass('link-image');
+
 					if (this.args[0].hasOwnProperty('passage')) {
 						$image.attr('data-passage', this.args[0].passage);
 					}
@@ -1276,6 +1286,7 @@
 				.addClass(`macro-${this.name}`)
 				.ariaClick({
 					namespace : '.macros',
+					role      : passage != null ? 'link' : 'button', // lazy equality for null
 					one       : passage != null // lazy equality for null
 				}, this.createShadowWrapper(
 					this.payload[0].contents !== ''
@@ -1392,7 +1403,22 @@
 				return this.error('no options specified');
 			}
 
-			const autoselect = this.args.length > 1 && this.args[1] === 'autoselect';
+			const config = {
+				autoselect : false,
+				once       : false
+			};
+
+			// Process arguments.
+			for (let i = 1; i < this.args.length; ++i) {
+				const arg = this.args[i];
+
+				switch (arg) {
+				case 'once':       config.once = true; break;
+				case 'autoselect': config.autoselect = true; break;
+				default:           return this.error(`unknown argument: ${arg}`);
+				}
+			}
+
 			const options    = [];
 			const tagCount   = { option : 0, optionsfrom : 0 };
 			let selectedIdx = -1;
@@ -1409,13 +1435,37 @@
 						return this.error(`no arguments specified for <<${payload.name}>> (#${tagCount.option})`);
 					}
 
-					options.push({
-						label : String(payload.args[0]),
-						value : payload.args.length === 1 ? payload.args[0] : payload.args[1]
-					});
+					const option = { label : String(payload.args[0]) };
+					let isSelected = false;
 
-					if (payload.args.length > 2 && payload.args[2] === 'selected') {
-						if (autoselect) {
+					switch (payload.args.length) {
+					case 1:
+						option.value = payload.args[0];
+						break;
+
+					case 2:
+						if (payload.args[1] === 'selected') {
+							option.value = payload.args[0];
+							isSelected = true;
+						}
+						else {
+							option.value = payload.args[1];
+						}
+						break;
+
+					default:
+						option.value = payload.args[1];
+
+						if (payload.args[2] === 'selected') {
+							isSelected = true;
+						}
+						break;
+					}
+
+					options.push(option);
+
+					if (isSelected) {
+						if (config.autoselect) {
 							return this.error('cannot specify both the autoselect and selected keywords');
 						}
 						else if (selectedIdx !== -1) {
@@ -1475,7 +1525,7 @@
 			// No options were selected by the user, so we must select one.
 			if (selectedIdx === -1) {
 				// Attempt to automatically select an option by matching the variable's current value.
-				if (autoselect) {
+				if (config.autoselect) {
 					// NOTE: This will usually fail for objects due to a variety of reasons.
 					const sameValueZero = Util.sameValueZero;
 					const curValue      = State.getVar(varName);
@@ -1491,17 +1541,33 @@
 
 			// Set up and append the appropriate element to the output buffer.
 			if (this.name === 'cycle') {
-				let cycleIdx = selectedIdx;
-				jQuery(document.createElement('a'))
-					.wikiWithOptions({ profile : 'core' }, options[selectedIdx].label)
-					.attr('id', `${this.name}-${varId}`)
-					.addClass(`macro-${this.name}`)
-					.ariaClick({ namespace : '.macros' }, this.createShadowWrapper(function () {
-						cycleIdx = (cycleIdx + 1) % options.length;
-						$(this).empty().wikiWithOptions({ profile : 'core' }, options[cycleIdx].label);
-						State.setVar(varName, options[cycleIdx].value);
-					}))
-					.appendTo(this.output);
+				const lastIdx = options.length - 1;
+
+				if (config.once && selectedIdx === lastIdx) {
+					jQuery(this.output)
+						.wikiWithOptions({ profile : 'core' }, options[selectedIdx].label);
+				}
+				else {
+					let cycleIdx = selectedIdx;
+					jQuery(document.createElement('a'))
+						.wikiWithOptions({ profile : 'core' }, options[selectedIdx].label)
+						.attr('id', `${this.name}-${varId}`)
+						.addClass(`macro-${this.name}`)
+						.ariaClick({
+							namespace : '.macros',
+							role      : 'button'
+						}, this.createShadowWrapper(function () {
+							const $this = $(this);
+							cycleIdx = (cycleIdx + 1) % options.length;
+							State.setVar(varName, options[cycleIdx].value);
+							$this.empty().wikiWithOptions({ profile : 'core' }, options[cycleIdx].label);
+
+							if (config.once && cycleIdx === lastIdx) {
+								$this.off().contents().unwrap();
+							}
+						}))
+						.appendTo(this.output);
+				}
 			}
 			else { // this.name === 'listbox'
 				const $select = jQuery(document.createElement('select'));
@@ -1658,10 +1724,11 @@
 			// Set up and append the input element to the output buffer.
 			jQuery(el)
 				.attr({
-					id       : `${this.name}-${varId}`,
-					name     : `${this.name}-${varId}`,
-					type     : asNumber ? 'number' : 'text',
-					tabindex : 0 // for accessiblity
+					id        : `${this.name}-${varId}`,
+					name      : `${this.name}-${varId}`,
+					type      : asNumber ? 'number' : 'text',
+					inputmode : asNumber ? 'decimal' : 'text',
+					tabindex  : 0 // for accessiblity
 				})
 				.addClass(`macro-${this.name}`)
 				.on('change.macros', this.createShadowWrapper(function () {
@@ -1921,7 +1988,7 @@
 					continue;
 				}
 
-				jQuery(Wikifier.createInternalLink(
+				const $link = jQuery(Wikifier.createInternalLink(
 					jQuery(document.createElement('li')).appendTo($list),
 					passage,
 					null,
@@ -1939,6 +2006,10 @@
 				))
 					.addClass(`macro-${this.name}`)
 					.append($image || document.createTextNode(text));
+
+				if ($image) {
+					$link.addClass('link-image');
+				}
 			}
 		}
 	});
@@ -2056,10 +2127,10 @@
 			// 	return;
 			// }
 
-			let $el;
+			let $link;
 
 			if (this.name !== 'back' || momentIndex !== -1) {
-				$el = jQuery(document.createElement('a'))
+				$link = jQuery(document.createElement('a'))
 					.addClass('link-internal')
 					.ariaClick(
 						{ one : true },
@@ -2067,13 +2138,17 @@
 							? () => Engine.play(passage)
 							: () => Engine.goTo(momentIndex)
 					);
+
+				if ($image) {
+					$link.addClass('link-image');
+				}
 			}
 			else {
-				$el = jQuery(document.createElement('span'))
+				$link = jQuery(document.createElement('span'))
 					.addClass('link-disabled');
 			}
 
-			$el
+			$link
 				.addClass(`macro-${this.name}`)
 				.append($image || document.createTextNode(text || L10n.get(`macro${this.name.toUpperFirst()}Text`)))
 				.appendTo(this.output);
@@ -2135,20 +2210,27 @@
 				text    = this.args[1];
 			}
 
+			let $link;
+
 			if (
 				   State.variables.hasOwnProperty('#choice')
 				&& State.variables['#choice'].hasOwnProperty(choiceId)
 				&& State.variables['#choice'][choiceId]
 			) {
-				jQuery(document.createElement('span'))
+				$link = jQuery(document.createElement('span'))
 					.addClass(`link-disabled macro-${this.name}`)
 					.attr('tabindex', -1)
 					.append($image || document.createTextNode(text))
 					.appendTo(this.output);
+
+				if ($image) {
+					$link.addClass('link-image');
+				}
+
 				return;
 			}
 
-			jQuery(Wikifier.createInternalLink(this.output, passage, null, () => {
+			$link = jQuery(Wikifier.createInternalLink(this.output, passage, null, () => {
 				if (!State.variables.hasOwnProperty('#choice')) {
 					State.variables['#choice'] = {};
 				}
@@ -2161,6 +2243,10 @@
 			}))
 				.addClass(`macro-${this.name}`)
 				.append($image || document.createTextNode(text));
+
+			if ($image) {
+				$link.addClass('link-image');
+			}
 		}
 	});
 
@@ -3298,6 +3384,27 @@
 		Miscellaneous Macros.
 	*******************************************************************************************************************/
 	/*
+		<<done>>
+	*/
+	Macro.add('done', {
+		skipArgs : true,
+		tags     : null,
+
+		handler() {
+			const contents = this.payload[0].contents.trim();
+
+			// Do nothing if there's no content to process.
+			if (contents === '') {
+				return;
+			}
+
+			setTimeout(this.createShadowWrapper(
+				() => $.wiki(contents)
+			), Engine.minDomActionDelay);
+		}
+	});
+
+	/*
 		<<goto>>
 	*/
 	Macro.add('goto', {
@@ -3628,6 +3735,7 @@
 			}
 
 			const widgetName = this.args[0];
+			const isNonVoid  = this.args.length > 1 && this.args[1] === 'container';
 
 			if (Macro.has(widgetName)) {
 				if (!Macro.get(widgetName).isWidget) {
@@ -3639,30 +3747,52 @@
 			}
 
 			try {
-				Macro.add(widgetName, {
+				const widgetDef = {
 					isWidget : true,
-					handler  : (function (contents) {
+					handler  : (function (widgetCode) {
 						return function () {
-							let argsCache;
+							const shadowStore = {};
 
-							try {
-								// Cache the existing value of the `$args` variable, if necessary.
-								if (State.variables.hasOwnProperty('args')) {
-									argsCache = State.variables.args;
+							// Cache the existing value of the `_args` variable, if necessary.
+							if (State.temporary.hasOwnProperty('args')) {
+								shadowStore._args = State.temporary.args;
+							}
+
+							// Set up the widget `_args` variable and add a shadow.
+							State.temporary.args = [...this.args];
+							State.temporary.args.raw = this.args.raw;
+							State.temporary.args.full = this.args.full;
+							this.addShadow('_args');
+
+							if (isNonVoid) {
+								// Cache the existing value of the `_contents` variable, if necessary.
+								if (State.temporary.hasOwnProperty('contents')) {
+									shadowStore._contents = State.temporary.contents;
 								}
 
-								// Set up the widget `$args` variable and add a shadow.
-								State.variables.args = [...this.args];
-								State.variables.args.raw = this.args.raw;
-								State.variables.args.full = this.args.full;
-								this.addShadow('$args');
+								// Set up the widget `_contents` variable and add a shadow.
+								State.temporary.contents = this.payload[0].contents;
+								this.addShadow('_contents');
+							}
 
+							/* legacy */
+							// Cache the existing value of the `$args` variable, if necessary.
+							if (State.variables.hasOwnProperty('args')) {
+								shadowStore.$args = State.variables.args;
+							}
+
+							// Set up the widget `$args` variable and add a shadow.
+							State.variables.args = State.temporary.args;
+							this.addShadow('$args');
+							/* /legacy */
+
+							try {
 								// Set up the error trapping variables.
 								const resFrag = document.createDocumentFragment();
 								const errList = [];
 
-								// Wikify the widget contents.
-								new Wikifier(resFrag, contents);
+								// Wikify the widget's code.
+								new Wikifier(resFrag, widgetCode);
 
 								// Carry over the output, unless there were errors.
 								Array.from(resFrag.querySelectorAll('.error')).forEach(errEl => {
@@ -3673,24 +3803,50 @@
 									this.output.appendChild(resFrag);
 								}
 								else {
-									return this.error(`error${errList.length > 1 ? 's' : ''} within widget contents (${errList.join('; ')})`);
+									return this.error(`error${errList.length > 1 ? 's' : ''} within widget code (${errList.join('; ')})`);
 								}
 							}
 							catch (ex) {
 								return this.error(`cannot execute widget: ${ex.message}`);
 							}
 							finally {
+								// Revert the `_args` variable shadowing.
+								if (shadowStore.hasOwnProperty('_args')) {
+									State.temporary.args = shadowStore._args;
+								}
+								else {
+									delete State.temporary.args;
+								}
+
+								if (isNonVoid) {
+									// Revert the `_contents` variable shadowing.
+									if (shadowStore.hasOwnProperty('_contents')) {
+										State.temporary.contents = shadowStore._contents;
+									}
+									else {
+										delete State.temporary.contents;
+									}
+								}
+
+								/* legacy */
 								// Revert the `$args` variable shadowing.
-								if (typeof argsCache !== 'undefined') {
-									State.variables.args = argsCache;
+								if (shadowStore.hasOwnProperty('$args')) {
+									State.variables.args = shadowStore.$args;
 								}
 								else {
 									delete State.variables.args;
 								}
+								/* /legacy */
 							}
 						};
 					})(this.payload[0].contents)
-				});
+				};
+
+				if (isNonVoid) {
+					widgetDef.tags = [];
+				}
+
+				Macro.add(widgetName, widgetDef);
 
 				// Custom debug view setup.
 				if (Config.debug) {

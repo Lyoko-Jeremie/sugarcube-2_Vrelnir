@@ -2,7 +2,7 @@
 
 	lib/util.js
 
-	Copyright © 2013–2020 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
+	Copyright © 2013–2021 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
@@ -20,14 +20,38 @@ var Util = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		NOTE: In ≤ES5, returns the value of the `[[Class]]` internal slot for objects.
 	*/
-	function utilGetType(obj) {
-		if (obj === null) { return 'null'; }
+	const utilGetType = (() => {
+		// Cache the `<Object>.toString()` method.
+		const toString = Object.prototype.toString;
 
-		const baseType = typeof obj;
-		return baseType === 'object'
-			? Object.prototype.toString.call(obj).slice(8, -1)
-			: baseType;
-	}
+		// If the browser is using the `Map()` and `Set()` polyfills, then return
+		// a version of `utilGetType()` that contains special cases for them, since
+		// they do not have a `[[Class]]` internal slot and the `@@toStringTag`
+		// internal property is unavailable to them.
+		if (toString.call(new Map()) === '[object Object]') {
+			return function utilGetType(O) {
+				if (O === null) { return 'null'; }
+
+				// Special cases for the `Map` and `Set` polyfills.
+				//
+				// NOTE: We don't special case the `WeakMap` and `WeakSet` polyfills
+				// here since they're (a) unlikely to be used and (b) broken anyway.
+				if (O instanceof Map) { return 'Map'; }
+				if (O instanceof Set) { return 'Set'; }
+
+				const baseType = typeof O;
+				return baseType === 'object' ? toString.call(O).slice(8, -1) : baseType;
+			};
+		}
+
+		// Elsewise, return the regular `utilGetType()` function.
+		return function utilGetType(O) {
+			if (O === null) { return 'null'; }
+
+			const baseType = typeof O;
+			return baseType === 'object' ? toString.call(O).slice(8, -1) : baseType;
+		};
+	})();
 
 	/*
 		Returns whether the passed value is a boolean or one of the strings "true"
@@ -168,6 +192,22 @@ var Util = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		// For v3.
 		// return base.replace(_illegalSlugCharsRe, '-');
+	}
+
+	/*
+		Returns a sanitized version of the given string that should be safe for use
+		as a filename under both Windows and Unix-based/-like operating systems.
+
+		NOTE: The range of illegal characters consists of: C0 controls, double quote,
+		number, dollar, percent, ampersand, single quote, asterisk, plus, comma,
+		forward slash, colon, semi-colon, less-than, equals, greater-than, question,
+		backslash, caret, backquote/grave, pipe/vertical line, delete, C1 controls.
+	*/
+	const _illegalFilenameCharsRE = /[\x00-\x1f"#$%&'*+,/:;<=>?\\^`|\x7f-\x9f]+/g; // eslint-disable-line no-control-regex
+
+	function utilSanitizeFilename(str) {
+		return String(str).trim()
+			.replace(_illegalFilenameCharsRE, '');
 	}
 
 	/*
@@ -664,6 +704,28 @@ var Util = (() => { // eslint-disable-line no-unused-vars, no-var
 
 
 	/*******************************************************************************************************************
+		Browser API Functions.
+	*******************************************************************************************************************/
+	/*
+		Returns whether the given media query matches.
+	*/
+	const utilHasMediaQuery = (() => {
+		// If the browser does not support `matchMedia()`, then return
+		// a version of `utilHasMediaQuery()` that simply returns `false`.
+		if (typeof window.matchMedia !== 'function') {
+			return function utilHasMediaQuery() {
+				return false;
+			};
+		}
+
+		// Elsewise, return the regular `utilHasMediaQuery()` function.
+		return function utilHasMediaQuery(mediaQuery) {
+			return window.matchMedia(mediaQuery).matches;
+		};
+	})();
+
+
+	/*******************************************************************************************************************
 		Module Exports.
 	*******************************************************************************************************************/
 	return Object.freeze(Object.defineProperties({}, {
@@ -681,11 +743,12 @@ var Util = (() => { // eslint-disable-line no-unused-vars, no-var
 		/*
 			String Encoding Functions.
 		*/
-		slugify      : { value : utilSlugify },
-		escapeMarkup : { value : utilEscapeMarkup },
-		escape       : { value : utilEscape },
-		unescape     : { value : utilUnescape },
-		charAndPosAt : { value : utilCharAndPosAt },
+		slugify          : { value : utilSlugify },
+		sanitizeFilename : { value : utilSanitizeFilename },
+		escapeMarkup     : { value : utilEscapeMarkup },
+		escape           : { value : utilEscape },
+		unescape         : { value : utilUnescape },
+		charAndPosAt     : { value : utilCharAndPosAt },
 
 		/*
 			Time Functions.
@@ -701,6 +764,11 @@ var Util = (() => { // eslint-disable-line no-unused-vars, no-var
 		parseUrl         : { value : utilParseUrl },
 		newExceptionFrom : { value : utilNewExceptionFrom },
 		scrubEventKey    : { value : utilScrubEventKey },
+
+		/*
+			Browser API Functions.
+		*/
+		hasMediaQuery : { value : utilHasMediaQuery },
 
 		/*
 			Legacy Aliases.

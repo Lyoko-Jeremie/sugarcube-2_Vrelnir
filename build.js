@@ -1,23 +1,24 @@
 #!/usr/bin/env node
 /***********************************************************************************************************************
 
-	build.js (v1.4.18, 2020-11-08)
+	build.js (v1.7.1, 2021-12-21)
 		A Node.js-hosted build script for SugarCube.
 
-	Copyright © 2013–2020 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
+	Copyright © 2013–2021 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
-/* eslint-env node, es6 */
-/* eslint-disable strict */
+/* eslint-env node, es2021 */
 'use strict';
+
 
 /*******************************************************************************
 	Configuration
 *******************************************************************************/
+
 const CONFIG = {
 	js : {
-		main : [
+		files : [
 			// The ordering herein is significant.
 			'src/lib/alert.js',
 			'src/lib/patterns.js',
@@ -68,20 +69,23 @@ const CONFIG = {
 			outro : 'src/templates/outro.js'
 		}
 	},
-	css : [
-		// The ordering herein is significant.
-		'src/vendor/normalize.css',
-		'src/css/init-screen.css',
-		'src/css/font.css',
-		'src/css/core.css',
-		'src/css/core-display.css',
-		'src/css/core-passage.css',
-		'src/css/core-macro.css',
-		'src/css/ui-dialog.css',
-		'src/css/ui.css',
-		'src/css/ui-bar.css',
-		'src/css/ui-debug.css'
-	],
+	css : {
+		mixins : 'src/css/_mixins.css',
+		files  : [
+			// The ordering herein is significant.
+			'src/vendor/normalize.css',
+			'src/css/init-screen.css',
+			'src/css/font.css',
+			'src/css/core.css',
+			'src/css/core-display.css',
+			'src/css/core-passage.css',
+			'src/css/core-macro.css',
+			'src/css/ui-dialog.css',
+			'src/css/ui.css',
+			'src/css/ui-bar.css',
+			'src/css/ui-debug.css'
+		]
+	},
 	libs : [
 		// The ordering herein is significant.
 		'src/vendor/classList.min.js',
@@ -134,37 +138,37 @@ const CONFIG = {
 /*******************************************************************************
 	Main Script
 *******************************************************************************/
-/*
-	NOTICE!
 
-	Where string replacements are done, we use the replacement function style here to
-	disable all special replacement patterns, since some of them likely exist within
-	the replacement strings (e.g. '$&' within the application source).
-*/
+// NOTICE!
+//
+// Where string replacements are done, we use the replacement function style to
+// disable all special replacement patterns, since some of them may exist within
+// the replacement strings—e.g., `$&` within the HTML or JavaScript sources.
 
-const _fs   = require('fs');
+const {
+	log,
+	die,
+	fileExists,
+	makePath,
+	copyFile,
+	readFileContents,
+	writeFileContents,
+	concatFiles
+} = require('./scripts/build-utils');
 const _path = require('path');
-
-const _indent = ' -> ';
-const _opt    = require('node-getopt').create([
+const _opt  = require('node-getopt').create([
 	['b', 'build=VERSION', 'Build only for Twine major version: 1 or 2; default: build for all.'],
 	['d', 'debug',         'Keep debugging code; gated by DEBUG symbol.'],
 	['u', 'unminified',    'Suppress minification stages.'],
-	['6', 'es6',           'Suppress JavaScript transpilation stages.'],
+	['n', 'no-transpile',  'Suppress JavaScript transpilation stages.'],
 	['h', 'help',          'Print this help, then exit.']
 ])
-	.bindHelp()     // bind option 'help' to default action
-	.parseSystem(); // parse command line
-
-// uglify-js (v2) does not currently support ES6, so force `unminified` when `es6` is enabled.
-if (_opt.options.es6 && !_opt.options.unminified) {
-	_opt.options.unminified = true;
-}
+	.bindHelp()
+	.parseSystem();
 
 let _buildForTwine1 = true;
 let _buildForTwine2 = true;
 
-// build selection
 if (_opt.options.build) {
 	switch (_opt.options.build) {
 	case '1':
@@ -181,12 +185,12 @@ if (_opt.options.build) {
 	}
 }
 
-// build the project
-(() => {
+// Build the project.
+(async () => {
 	console.log('Starting builds...');
 
 	// Create the build ID file, if nonexistent.
-	if (!_fs.existsSync('.build')) {
+	if (!fileExists('.build')) {
 		writeFileContents('.build', '0');
 	}
 
@@ -203,7 +207,7 @@ if (_opt.options.build) {
 			patch      : semver.patch(version),
 			prerelease : prerelease && prerelease.length > 0 ? prerelease.join('.') : null,
 			build      : Number(readFileContents('.build')) + 1,
-			date       : (new Date()).toISOString(),
+			date       : new Date().toISOString(),
 
 			toString() {
 				const prerelease = this.prerelease ? `-${this.prerelease}` : '';
@@ -220,9 +224,9 @@ if (_opt.options.build) {
 		projectBuild({
 			build     : CONFIG.twine1.build,
 			version   : version, // eslint-disable-line object-shorthand
-			libSource : assembleLibraries(CONFIG.libs),                  // combine the libraries
-			appSource : compileJavaScript(CONFIG.js, { twine1 : true }), // combine and minify the app JS
-			cssSource : compileStyles(CONFIG.css)                        // combine and minify the app CSS
+			libSource : assembleLibraries(CONFIG.libs),                        // combine the libraries
+			appSource : await compileJavaScript(CONFIG.js, { twine1 : true }), // combine and minify the app JS
+			cssSource : compileStyles(CONFIG.css)                              // combine and minify the app CSS
 		});
 
 		// Process the files that simply need copied into the build.
@@ -237,9 +241,9 @@ if (_opt.options.build) {
 		projectBuild({
 			build     : CONFIG.twine2.build,
 			version   : version, // eslint-disable-line object-shorthand
-			libSource : assembleLibraries(CONFIG.libs),                   // combine the libraries
-			appSource : compileJavaScript(CONFIG.js, { twine1 : false }), // combine and minify the app JS
-			cssSource : compileStyles(CONFIG.css),                        // combine and minify the app CSS
+			libSource : assembleLibraries(CONFIG.libs),                         // combine the libraries
+			appSource : await compileJavaScript(CONFIG.js, { twine1 : false }), // combine and minify the app JS
+			cssSource : compileStyles(CONFIG.css),                              // combine and minify the app CSS
 
 			postProcess(sourceString) {
 				// Load the output format.
@@ -268,102 +272,14 @@ if (_opt.options.build) {
 
 	// Update the build ID.
 	writeFileContents('.build', String(version.build));
-})();
-
-// That's all folks!
-console.log('\nBuilds complete!  (check the "build" directory)');
+})()
+	.then(() => console.log('\nBuilds complete!  (check the "build" directory)'))
+	.catch(reason => console.log('\nERROR:', reason));
 
 
 /*******************************************************************************
 	Utility Functions
 *******************************************************************************/
-function log(message, indent) {
-	console.log('%s%s', indent ? indent : _indent, message);
-}
-
-// function warn(message) {
-// 	console.warn('%swarning: %s', _indent, message);
-// }
-
-function die(message, error) {
-	if (error) {
-		console.error('error: %s\n[@: %d/%d] Trace:\n', message, error.line, error.col, error.stack);
-	}
-	else {
-		console.error('error: %s', message);
-	}
-
-	process.exit(1);
-}
-
-function makePath(pathname) {
-	const pathBits = _path.normalize(pathname).split(_path.sep);
-
-	for (let i = 0; i < pathBits.length; ++i) {
-		const dirPath = i === 0 ? pathBits[i] : pathBits.slice(0, i + 1).join(_path.sep);
-
-		if (!_fs.existsSync(dirPath)) {
-			_fs.mkdirSync(dirPath);
-		}
-	}
-}
-
-function copyFile(srcFilename, destFilename) {
-	const srcPath  = _path.normalize(srcFilename);
-	const destPath = _path.normalize(destFilename);
-	let buf;
-
-	try {
-		buf = _fs.readFileSync(srcPath);
-	}
-	catch (ex) {
-		die(`cannot open file "${srcPath}" for reading (reason: ${ex.message})`);
-	}
-
-	try {
-		_fs.writeFileSync(destPath, buf);
-	}
-	catch (ex) {
-		die(`cannot open file "${destPath}" for writing (reason: ${ex.message})`);
-	}
-
-	return true;
-}
-
-function readFileContents(filename) {
-	const filepath = _path.normalize(filename);
-
-	try {
-		// the replace() is necessary because Node.js only offers binary mode file
-		// access, regardless of platform, so we convert DOS-style line terminators
-		// to UNIX-style, just in case someone adds/edits a file and gets DOS-style
-		// line termination all over it
-		return _fs.readFileSync(filepath, { encoding : 'utf8' }).replace(/\r\n/g, '\n');
-	}
-	catch (ex) {
-		die(`cannot open file "${filepath}" for reading (reason: ${ex.message})`);
-	}
-}
-
-function writeFileContents(filename, data) {
-	const filepath = _path.normalize(filename);
-
-	try {
-		_fs.writeFileSync(filepath, data, { encoding : 'utf8' });
-	}
-	catch (ex) {
-		die(`cannot open file "${filepath}" for writing (reason: ${ex.message})`);
-	}
-}
-
-function concatFiles(filenames, callback) {
-	const output = filenames.map(filename => {
-		const contents = readFileContents(filename);
-		return typeof callback === 'function' ? callback(contents, filename) : contents;
-	});
-	return output.join('\n');
-}
-
 function assembleLibraries(filenames) {
 	log('assembling libraries...');
 
@@ -371,80 +287,73 @@ function assembleLibraries(filenames) {
 }
 
 function compileJavaScript(filenameObj, options) {
-	/* eslint-disable camelcase, prefer-template */
 	log('compiling JavaScript...');
 
-	const babelCore = require('babel-core');
-	const babelOpts = {
-		code     : true,
-		compact  : false,
-		presets  : ['env'],
-		filename : 'sugarcube.js'
-	};
+	// Join the files.
+	let bundle = concatFiles(filenameObj.files);
 
-	// Join the files and transpile (ES6 → ES5) with Babel.
-	let	jsSource = concatFiles(filenameObj.main);
-	jsSource = readFileContents(filenameObj.wrap.intro)
-		+ '\n'
-		+ (_opt.options.es6 ? jsSource : babelCore.transform(jsSource, babelOpts).code)
-		+ '\n'
-		+ readFileContents(filenameObj.wrap.outro);
-
-	if (_opt.options.unminified) {
-		return [
-			'window.TWINE1=' + String(!!options.twine1),
-			'window.DEBUG=' + String(_opt.options.debug || false)
-		].join(';\n') + ';\n' + jsSource;
+	// Transpile to ES5 with Babel.
+	if (!_opt.options.noTranspile) {
+		const { transform } = require('@babel/core');
+		bundle = transform(bundle, {
+			// babelHelpers : 'bundled',
+			code     : true,
+			compact  : false,
+			presets  : [['@babel/preset-env']],
+			filename : 'sugarcube.bundle.js'
+		}).code;
 	}
 
-	try {
-		const uglifyjs = require('uglify-js');
-		const uglified = uglifyjs.minify(jsSource, {
-			fromString : true,
-			compress   : {
-				global_defs : {
-					TWINE1 : !!options.twine1,
-					DEBUG  : _opt.options.debug || false
-				},
-				screw_ie8 : true
-			},
-			mangle : {
-				screw_ie8 : true
-			},
-			output : {
-				screw_ie8 : true
-			}
-		});
-		return uglified.code;
-	}
-	catch (ex) {
-		let mesg = 'uglification error';
+	bundle = `${readFileContents(filenameObj.wrap.intro)}\n${bundle}\n${readFileContents(filenameObj.wrap.outro)}`;
 
-		if (ex.line > 0) {
-			const begin = ex.line > 4 ? ex.line - 4 : 0;
-			const end   = ex.line + 3 < jsSource.length ? ex.line + 3 : jsSource.length;
-			mesg += ':\n >> ' + jsSource.split(/\n/).slice(begin, end).join('\n >> ');
+	return (async source => {
+		if (_opt.options.unminified) {
+			return [
+				`window.TWINE1=${Boolean(options.twine1)}`,
+				`window.DEBUG=${_opt.options.debug || false}`,
+				source
+			].join(';\n');
 		}
 
-		die(mesg, ex);
-	}
-	/* eslint-enable camelcase, prefer-template */
+		// Minify the code with Terser.
+		const { minify } = require('terser');
+		const minified   = await minify(source, {
+			compress : {
+				global_defs : { // eslint-disable-line camelcase
+					TWINE1 : !!options.twine1,
+					DEBUG  : _opt.options.debug || false
+				}
+			},
+			mangle : false
+		});
+
+		if (minified.error) {
+			const { message, line, col, pos } = minified.error;
+			die(`JavaScript minification error: ${message}\n[@: ${line}/${col}/${pos}]`);
+		}
+
+		return minified.code;
+	})(bundle);
 }
 
-function compileStyles(filenames) {
-	/* eslint-disable prefer-template */
+function compileStyles(config) {
 	log('compiling CSS...');
 
-	const postcss         = require('postcss');
-	const CleanCss        = require('clean-css');
-	const normalizeRegExp = /normalize\.css$/;
+	const autoprefixer = require('autoprefixer');
+	const mixins       = require('postcss-mixins');
+	const postcss      = require('postcss');
+	const CleanCSS     = require('clean-css');
+	const excludeRE    = /(?:normalize)\.css$/;
+	const mixinContent = readFileContents(config.mixins);
 
-	return concatFiles(filenames, (contents, filename) => {
+	return concatFiles(config.files, (contents, filename) => {
 		let css = contents;
 
-		// Don't run autoprefixer on 'normalize.css'.
-		if (!normalizeRegExp.test(filename)) {
-			const processed = postcss([require('autoprefixer')]).process(css, { from : filename });
+		// Do not run the postcss plugins on files that match the exclusion regexp.
+		if (!excludeRE.test(filename)) {
+			css = `${mixinContent}\n${css}`;
+
+			const processed = postcss([mixins, autoprefixer]).process(css, { from : filename });
 
 			css = processed.css;
 
@@ -452,18 +361,18 @@ function compileStyles(filenames) {
 		}
 
 		if (!_opt.options.unminified) {
-			css = new CleanCss({
-				level         : 1,    // [clean-css v4] `1` is the default, but let's be specific
-				compatibility : 'ie9' // [clean-css v4] 'ie10' is the default, so restore IE9 support
+			css = new CleanCSS({
+				level         : 1,
+				compatibility : 'ie9'
 			})
 				.minify(css)
 				.styles;
 		}
 
-		return '<style id="style-' + _path.basename(filename, '.css').toLowerCase().replace(/[^0-9a-z]+/g, '-')
-			+ '" type="text/css">' + css + '</style>';
+		const fileSlug = _path.basename(filename, '.css').toLowerCase().replace(/[^0-9a-z]+/g, '-');
+
+		return `<style id="style-${fileSlug}" type="text/css">${css}</style>`;
 	});
-	/* eslint-enable prefer-template */
 }
 
 function projectBuild(project) {
@@ -472,7 +381,8 @@ function projectBuild(project) {
 
 	log(`building: "${outfile}"`);
 
-	let output  = readFileContents(infile); // load the story format template
+	// Load the story format template.
+	let output = readFileContents(infile);
 
 	// Process the source replacement tokens. (First!)
 	output = output.replace(/(['"`])\{\{BUILD_LIB_SOURCE\}\}\1/, () => project.libSource);

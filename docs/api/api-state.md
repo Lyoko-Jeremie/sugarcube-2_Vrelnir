@@ -387,6 +387,41 @@ State.metadata.delete('achievements');
 
 <!-- *********************************************************************** -->
 
+### `State.metadata.entries()` → *Array&lt;Array&lt;string, any&gt;&gt;* {#state-api-method-metadata-entries}
+
+Returns an array of the story metadata store's key/value pairs as `[key, value]` arrays.
+
+#### History:
+
+* `v2.36.0`: Introduced.
+
+#### Parameters: *none*
+
+#### Examples:
+
+```js
+// Iterate over the pairs with a `for` loop.
+var metadata = State.metadata.entries();
+for (var i = 0; i < metadata.length; ++i) {
+	var key   = metadata[i][0];
+	var value = metadata[i][1];
+
+	/* do something */
+}
+```
+
+```js
+// Iterate over the pairs with `<Array>.forEach()`.
+State.metadata.entries().forEach(function (pair) {
+	var key   = pair[0];
+	var value = pair[1];
+
+	/* do something */
+});
+```
+
+<!-- *********************************************************************** -->
+
 ### `State.metadata.get(key)` → *any* {#state-api-method-metadata-get}
 
 Returns the value associated with the specified key from the story metadata store.
@@ -427,6 +462,37 @@ Returns whether the specified key exists within the story metadata store.
 if (State.metadata.has('achievements')) {
 	/* do something */
 }
+```
+
+<!-- *********************************************************************** -->
+
+### `State.metadata.keys()` → *Array&lt;string&gt;* {#state-api-method-metadata-keys}
+
+Returns an array of the story metadata store's keys.
+
+#### History:
+
+* `v2.36.0`: Introduced.
+
+#### Parameters: *none*
+
+#### Examples:
+
+```js
+// Iterate over the keys with a `for` loop.
+var metadataKeys = State.metadata.keys();
+for (var i = 0; i < metadataKeys.length; ++i) {
+	var key = metadataKeys[i];
+
+	/* do something */
+}
+```
+
+```js
+// Iterate over the keys with `<Array>.forEach()`.
+State.metadata.keys().forEach(function (key) {
+	/* do something */
+});
 ```
 
 <!-- *********************************************************************** -->
@@ -473,7 +539,7 @@ State.metadata.set('ngplus', true);
 Initializes the seedable pseudo-random number generator (PRNG) and integrates it into the story state and saves.  Once initialized, the [`State.random()`](#state-api-method-random) method and story functions, [`random()`](#functions-function-random) and [`randomFloat()`](#functions-function-randomfloat), return deterministic results from the seeded PRNG—by default, they return non-deterministic results from [`Math.random()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random).
 
 <p role="note"><b>Note:</b>
-<code>State.prng.init()</code> <em>must be</em> called during story initialization, within either a script section (Twine&nbsp;2: the Story JavaScript, Twine&nbsp;1/Twee: a <code>script</code>-tagged passage) or the <code>StoryInit</code> special passage.  Additionally, it is <strong><em>strongly</em></strong> recommended that you do not specify any arguments to <code>State.prng.init()</code> and allow it to automatically seed itself.  If you should chose to use an explicit seed, however, it is <strong><em>strongly</em></strong> recommended that you also enable additional entropy, otherwise all playthroughs for all players will be exactly the same.
+<code>State.prng.init()</code> <em>must be</em> called during story initialization, within either your project's JavaScript section (Twine&nbsp;2: the Story JavaScript; Twine&nbsp;1/Twee: a <code>script</code>-tagged passage) or the <code>StoryInit</code> special passage.  Additionally, it is <strong><em>strongly</em></strong> recommended that you do not specify any arguments to <code>State.prng.init()</code> and allow it to automatically seed itself.  If you should chose to use an explicit seed, however, it is <strong><em>strongly</em></strong> recommended that you also enable additional entropy, otherwise all playthroughs for all players will be exactly the same.
 </p>
 
 #### History:

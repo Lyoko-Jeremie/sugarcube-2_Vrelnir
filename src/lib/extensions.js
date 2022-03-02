@@ -2,7 +2,7 @@
 
 	lib/extensions.js
 
-	Copyright © 2013–2020 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
+	Copyright © 2013–2021 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
@@ -695,6 +695,40 @@
 			while ((pos = indexOf.call(this, needle, pos)) !== -1) {
 				++count;
 				++pos;
+			}
+
+			return count;
+		}
+	});
+
+	/*
+		Returns the number elements within the array that pass the test
+		implemented by the given predicate function.
+	*/
+	Object.defineProperty(Array.prototype, 'countWith', {
+		configurable : true,
+		writable     : true,
+
+		value(predicate, thisArg) {
+			if (this == null) { // lazy equality for null
+				throw new TypeError('Array.prototype.countWith called on null or undefined');
+			}
+			if (typeof predicate !== 'function') {
+				throw new Error('Array.prototype.countWith predicate parameter must be a function');
+			}
+
+			const length = this.length >>> 0;
+
+			if (length === 0) {
+				return 0;
+			}
+
+			let count = 0;
+
+			for (let i = 0; i < length; ++i) {
+				if (predicate.call(thisArg, this[i], i, this)) {
+					++count;
+				}
 			}
 
 			return count;
@@ -1674,6 +1708,42 @@
 			}
 
 			return ['(revive:eval)', [code, data]];
+		}
+	});
+
+	/*
+		Backup the original `JSON.stringify()` and replace it with a revive wrapper aware version.
+	*/
+	Object.defineProperty(JSON, '_real_stringify', {
+		value : JSON.stringify
+	});
+	Object.defineProperty(JSON, 'stringify', {
+		configurable : true,
+		writable     : true,
+
+		value(value, replacer, space) {
+			return JSON._real_stringify(value, (key, val) => {
+				let value = val;
+
+				/*
+					Call the custom replacer, if specified.
+				*/
+				if (typeof replacer === 'function') {
+					try {
+						value = replacer(key, value);
+					}
+					catch (ex) { /* no-op; although, perhaps, it would be better to throw an error here */ }
+				}
+
+				/*
+					Attempt to replace values.
+				*/
+				if (typeof value === 'undefined') {
+					value = ['(revive:eval)', 'undefined'];
+				}
+
+				return value;
+			}, space);
 		}
 	});
 
