@@ -2,13 +2,16 @@
 
 	l10n-template.js – Localization Template
 
-	Copyright © 2019–2020 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
+	Copyright © 2019–2021 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 	For more information about the guidelines used to create this localization, see:
 		http://www.motoslave.net/sugarcube/2/docs/#guide-localization
 
 ***********************************************************************************************************************/
+/* global l10nStrings */
+/* eslint-disable strict */
+
 /*
 	ATTENTION TRANSLATORS
 
@@ -55,6 +58,7 @@
 	l10nStrings.errorTitle              = 'Error';
 	l10nStrings.errorToggle             = 'Toggle the error view';
 	l10nStrings.errorNonexistentPassage = 'the passage "{passage}" does not exist'; // NOTE: `passage` is supplied locally
+	l10nStrings.errorSaveDiskLoadFailed = 'failed to load save file from disk';
 	l10nStrings.errorSaveMissingData    = 'save is missing required data. Either the loaded file is not a save or the save has become corrupted';
 	l10nStrings.errorSaveIdMismatch     = 'save is from the wrong {identity}';
 

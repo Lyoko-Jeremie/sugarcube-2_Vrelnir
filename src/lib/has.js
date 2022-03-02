@@ -2,7 +2,7 @@
 
 	lib/has.js
 
-	Copyright © 2013–2020 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
+	Copyright © 2013–2021 Thomas Michael Edwards <thomasmedwards@gmail.com>. All rights reserved.
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
@@ -33,7 +33,6 @@ var Has = (() => { // eslint-disable-line no-unused-vars, no-var
 				'File' in window &&
 				'FileList' in window &&
 				'FileReader' in window &&
-				!Browser.isMobile.any() &&
 				(!Browser.isOpera || Browser.operaVersion >= 15);
 		}
 		catch (ex) { /* no-op */ }

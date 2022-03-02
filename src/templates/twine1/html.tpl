@@ -8,7 +8,7 @@
 
 SugarCube (v'{{BUILD_VERSION_VERSION}}'): A free (gratis and libre) story format.
 
-Copyright © 2013–2020 Thomas Michael Edwards <thomasmedwards@gmail.com>.
+Copyright © 2013–2021 Thomas Michael Edwards <thomasmedwards@gmail.com>.
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -50,8 +50,8 @@ if(document.head&&document.addEventListener&&document.querySelector&&Object.crea
 </head>
 <body>
 	<div id="init-screen">
-		<div id="init-no-js"><noscript>JavaScript is required. Please enable it to continue.</noscript></div>
-		<div id="init-lacking">Your browser lacks required capabilities. Please upgrade it or switch to another to continue.</div>
+		<div id="init-no-js"><noscript>JavaScript must be enabled to play.</noscript></div>
+		<div id="init-lacking"><p>Browser lacks capabilities required to play.</p><p>Upgrade or switch to another browser.</p></div>
 		<div id="init-loading"><div>Loading&hellip;</div></div>
 	</div>
 	<div id="store-area" data-size="STORY_SIZE" hidden>"STORY"</div>
