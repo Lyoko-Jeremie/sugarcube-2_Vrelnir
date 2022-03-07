@@ -15,27 +15,25 @@ var PRNGWrapper = (() => { // eslint-disable-line no-unused-vars, no-var
 	*******************************************************************************************************************/
 	class PRNGWrapper {
 		constructor(seed, options) {
+			/* eslint-disable new-cap */
 			/* Create the Math.seedrandom initialisation to use the state object. */
 			/* Pass seed through the constructor to return either a copy of itself, or a new generated seed. */
-			const seeder = new Math.seedrandom(seed, { state: false }, (prng, seed) => ({seed}));
+			const seeder = new Math.seedrandom(seed, { state : false }, (_, seed) => ({ seed }));
 			const prngObj = new Math.seedrandom(seeder.seed, options);
-			/* eslint-disable new-cap */
 			Object.defineProperties(this, {
-				_prng: {
-					value: prngObj
+				_prng : {
+					value : prngObj
 				},
-				seed: {
-					writable: true,
-					value: seeder.seed
+				seed : {
+					writable : true, value : seeder.seed
 				},
-				pull: {
-					writable: true,
-					value: 0
+				pull : {
+					writable : true, value : 0
 				},
-				state: {
-					value: prngObj.state
+				state : {
+					value : prngObj.state
 				},
-				random: {
+				random : {
 					value() {
 						return this._prng();
 					}
@@ -54,9 +52,9 @@ var PRNGWrapper = (() => { // eslint-disable-line no-unused-vars, no-var
 				Old: seed : prng.seed,
 					 pull : prng.pull */
 			return {
-				prng: prng.state(),
-				seed: prng.seed,
-				pull: prng.pull
+				prng : prng.state(),
+				seed : prng.seed,
+				pull : prng.pull
 			};
 		}
 
@@ -71,7 +69,7 @@ var PRNGWrapper = (() => { // eslint-disable-line no-unused-vars, no-var
 				has reached the original pull count.
 			*/
 			/* Create new PRNGWrapper with the state object of the old PRNG object. */
-			const prng = new PRNGWrapper(prngObj.seed, { state: prngObj.state });
+			const prng = new PRNGWrapper(prngObj.seed, { state : prngObj.state });
 			prng.pull = prngObj.pull;
 			return prng;
 		}
