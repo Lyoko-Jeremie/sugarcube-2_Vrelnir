@@ -612,7 +612,9 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		_onSaveHandlers.forEach(fn => fn(saveObj, details));
 
 		// Delta encode the state history and delete the non-encoded property.
-		saveObj.state.delta = State.deltaEncode(saveObj.state.history);
+		// // saveObj.state.delta = State.deltaEncode(saveObj.state.history);
+		// use jdelta instead
+		saveObj.state.jdelta = State.jdeltaEncode(saveObj.state.history);
 		delete saveObj.state.history;
 
 		return saveObj;
@@ -625,7 +627,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			/* eslint-disable no-param-reassign */
 			/* legacy */
 			// Update saves with old/obsolete properties.
-			_savesObjUpdate(saveObj);
+			// _savesObjUpdate(saveObj);
 			/* /legacy */
 
 			if (!saveObj || !saveObj.hasOwnProperty('id') || !saveObj.hasOwnProperty('state')) {
@@ -633,8 +635,12 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			}
 
 			// Delta decode the state history and delete the encoded property.
-			saveObj.state.history = State.deltaDecode(saveObj.state.delta);
-			delete saveObj.state.delta;
+			if (!saveObj.state.history) {
+				if (saveObj.state.delta) saveObj.state.history = State.deltaDecode(saveObj.state.delta);
+				delete saveObj.state.delta;
+				if (saveObj.state.jdelta) saveObj.state.history = State.jdeltaDecode(saveObj.state.jdelta);
+				delete saveObj.state.jdelta;
+			}
 
 			_onLoadHandlers.forEach(fn => fn(saveObj));
 

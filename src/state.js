@@ -90,7 +90,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns the current story state marshaled into a serializable object.
 	*/
-	function stateMarshal(noDelta) {
+	function stateMarshal(noDelta = true) {
 		/*
 			Gather the properties.
 		*/
@@ -119,7 +119,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Restores the story state from a marshaled story state serialization object.
 	*/
-	function stateUnmarshal(stateObj, noDelta) {
+	function stateUnmarshal(stateObj, noDelta = true) {
 		if (stateObj == null) { // lazy equality for null
 			throw new Error('state object is null or undefined');
 		}
@@ -543,6 +543,47 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		return historyArr;
 	}
 
+	/**
+	 * encodes history array with jsondiffpatch delta, as default diff has
+	 * no mechanism for finding changes in objects and arrays.
+	 *
+	 * @param {array} historyArr
+	 * @returns {array} jdelta
+	 */
+	function historyjDeltaEncode(historyArr) {
+		if (!Array.isArray(historyArr)) return null;
+		if (historyArr.length === 0) return [];
+
+		const jdelta = [historyArr[0]];
+		const firstFrame = JSON.stringify(historyArr[0]);
+		// for speed and simplicity, only calculate delta between the first and target frame
+		for (let i = 1, iend = historyArr.length; i < iend; ++i) {
+			jdelta.push(jsondiffpatch.diff(firstFrame, JSON.stringify(historyArr[i])));
+		}
+
+		return jdelta;
+	}
+
+	/**
+	 * restores history array from jdelta
+	 *
+	 * @param {array} jdelta jsondiffpatch delta-encoded array
+	 * @returns {array}
+	 */
+	function historyjDeltaDecode(jdelta) {
+		if (!Array.isArray(jdelta)) return null;
+		if (jdelta.length === 0) return [];
+
+		const historyArr = [clone(jdelta[0])];
+		const state = JSON.stringify(jdelta[0]);
+
+		for (let i = 1, iend = jdelta.length; i < iend; ++i) {
+			historyArr.push(JSON.parse(jsondiffpatch.patch(state, jdelta[i])));
+		}
+
+		return historyArr;
+	}
+
 
 	/*******************************************************************************************************************
 		PRNG Functions.
@@ -761,6 +802,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		go          : { value : historyGo },
 		deltaEncode : { value : historyDeltaEncode },
 		deltaDecode : { value : historyDeltaDecode },
+		jdeltaEncode: { value : historyjDeltaEncode },
+		jdeltaDecode: { value : historyjDeltaDecode },
 
 		/*
 			PRNG Functions.
