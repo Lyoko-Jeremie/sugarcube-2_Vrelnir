@@ -553,12 +553,11 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	function historyjDeltaEncode(historyArr) {
 		if (!Array.isArray(historyArr)) return null;
 		if (historyArr.length === 0) return [];
+		if (historyArr.length === 1) return;
 
-		const jdelta = [historyArr[0]];
-		const firstFrame = JSON.stringify(historyArr[0]);
-		// for speed and simplicity, only calculate delta between the first and target frame
+		const jdelta = [];
 		for (let i = 1, iend = historyArr.length; i < iend; ++i) {
-			jdelta.push(jsondiffpatch.diff(firstFrame, JSON.stringify(historyArr[i])));
+			jdelta.push(jsondiffpatch.diff(JSON.stringify(historyArr[i - 1]), JSON.stringify(historyArr[i])));
 		}
 
 		return jdelta;
@@ -570,15 +569,15 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	 * @param {array} jdelta jsondiffpatch delta-encoded array
 	 * @returns {array}
 	 */
-	function historyjDeltaDecode(jdelta) {
-		if (!Array.isArray(jdelta)) return null;
-		if (jdelta.length === 0) return [];
+	function historyjDeltaDecode(delta, jdelta) {
+		if (!Array.isArray(delta)) return null;
+		if (delta.length === 0) return [];
+		if (!jdelta) return;
 
-		const historyArr = [clone(jdelta[0])];
-		const state = JSON.stringify(jdelta[0]);
+		const historyArr = delta;
 
 		for (let i = 1, iend = jdelta.length; i < iend; ++i) {
-			historyArr.push(JSON.parse(jsondiffpatch.patch(state, jdelta[i])));
+			historyArr.push(JSON.parse(jsondiffpatch.patch(JSON.stringify(historyArr[i]), jdelta[i])));
 		}
 
 		return historyArr;
