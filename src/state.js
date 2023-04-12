@@ -553,7 +553,6 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	function historyjDeltaEncode(historyArr) {
 		if (!Array.isArray(historyArr)) return null;
 		if (historyArr.length === 0) return [];
-		if (historyArr.length === 1) return;
 
 		const jdelta = [];
 		for (let i = 1, iend = historyArr.length; i < iend; ++i) {
@@ -572,11 +571,11 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	function historyjDeltaDecode(delta, jdelta) {
 		if (!Array.isArray(delta)) return null;
 		if (delta.length === 0) return [];
-		if (!jdelta) return;
+		if (!jdelta) return delta;
 
 		const historyArr = delta;
 
-		for (let i = 1, iend = jdelta.length; i < iend; ++i) {
+		for (let i = 0, iend = jdelta.length; i < iend; ++i) {
 			historyArr.push(JSON.parse(jsondiffpatch.patch(JSON.stringify(historyArr[i]), jdelta[i])));
 		}
 
