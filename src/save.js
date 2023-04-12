@@ -517,7 +517,8 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		_onSaveHandlers.forEach(fn => fn(saveObj, details));
 
 		// write the oldest history frame to delta for compatibility with old versions, then code jdelta separately
-		saveObj.state.delta = [saveObj.state.history[0]];
+		// wrap delta objects in JSON.parse(JSON.stringify()) because jsondiffpatch is picky
+		saveObj.state.delta = JSON.parse(JSON.stringify([saveObj.state.history[0]]));
 		saveObj.state.jdelta = State.jdeltaEncode(JSON.parse(JSON.stringify(saveObj.state.history)));
 		delete saveObj.state.history;
 		// save real index and fake it for compatibility
