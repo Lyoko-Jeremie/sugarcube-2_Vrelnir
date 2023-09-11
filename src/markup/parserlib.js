@@ -114,11 +114,13 @@
 		name      : 'macro',
 		profiles  : ['core'],
 		match     : '<<',
+		// <<(\/?[A-Za-z][\w-]*|[=-])(?:\s*)((?:(?:\/\*[^*]*\*+(?:[^/*][^*]*\*+)*\/)|(?:\/\/.*\n)|(?:`(?:\\.|[^`\\])*`)|(?:"(?:\\.|[^"\\])*")|(?:'(?:\\.|[^'\\])*')|(?:\[(?:[<>]?[Ii][Mm][Gg])?\[[^\r\n]*?\]\]+)|[^>]|(?:>(?!>)))*)>>
 		lookahead : new RegExp(`<<(/?${Patterns.macroName})(?:\\s*)((?:(?:/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/)|(?://.*\\n)|(?:\`(?:\\\\.|[^\`\\\\])*\`)|(?:"(?:\\\\.|[^"\\\\])*")|(?:'(?:\\\\.|[^'\\\\])*')|(?:\\[(?:[<>]?[Ii][Mm][Gg])?\\[[^\\r\\n]*?\\]\\]+)|[^>]|(?:>(?!>)))*)>>`, 'gm'),
 		working   : { source : '', name : '', arguments : '', index : 0 }, // the working parse object
 		context   : null, // last execution context object (top-level macros, hierarchically, have a null context)
 
 		handler(w) {
+			// console.log('Wikifier.Parser.add macro handler(w):', w, this.context, this);
 			const matchStart = this.lookahead.lastIndex = w.matchStart;
 
 			if (this.parseTag(w)) {
@@ -139,6 +141,7 @@
 
 						if (typeof macro.tags !== 'undefined') {
 							payload = this.parseBody(w, macro);
+							// console.log('Wikifier.Parser.add macro handler() payload:', structuredClone(payload), this.context);
 
 							if (!payload) {
 								w.nextMatch = nextMatch; // we must reset `w.nextMatch` here, as `parseBody()` modifies it
@@ -264,6 +267,7 @@
 		},
 
 		parseTag(w) {
+			// console.log('Wikifier.Parser.add macro parseTag(w):', w, this.context, this);
 			const match = this.lookahead.exec(w.source);
 
 			if (match && match.index === w.matchStart && match[1]) {
@@ -281,6 +285,8 @@
 		},
 
 		parseBody(w, macro) {
+			// console.log('Wikifier.Parser.add macro parseBody(w, macro):', w, macro, structuredClone(this.working), this.context, this);
+			// console.log('Wikifier.Parser.add macro parseBody(w, macro):', structuredClone(this.working), this.context);
 			const openTag  = this.working.name;
 			const closeTag = `/${openTag}`;
 			const closeAlt = `end${openTag}`;

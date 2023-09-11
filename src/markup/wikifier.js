@@ -27,6 +27,7 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 	*******************************************************************************************************************/
 	class Wikifier {
 		constructor(destination, source, options) {
+			console.log('class Wikifier constructor:', destination, source);
 			if (Wikifier.Parser.Profile.isEmpty()) {
 				Wikifier.Parser.Profile.compile();
 			}
@@ -222,6 +223,8 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 		}
 
 		outputText(destination, startPos, endPos) {
+			// console.log('outputText():source', this.source);
+			console.log('outputText():Text', this.source.substring(startPos, endPos));
 			jQuery(destination).append(document.createTextNode(this.source.substring(startPos, endPos)));
 		}
 
