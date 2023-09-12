@@ -27,7 +27,12 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 	*******************************************************************************************************************/
 	class Wikifier {
 		constructor(destination, source, options) {
-			console.log('class Wikifier constructor:', destination, source);
+			// console.log('class Wikifier constructor:', destination, source);
+			// eslint-disable-next-line no-undef
+			if (typeof i18nManager !== 'undefined') {
+				// eslint-disable-next-line no-undef,no-param-reassign
+				source = i18nManager.typeB.replaceInputStoryScript(source);
+			}
 			if (Wikifier.Parser.Profile.isEmpty()) {
 				Wikifier.Parser.Profile.compile();
 			}
@@ -224,7 +229,14 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		outputText(destination, startPos, endPos) {
 			// console.log('outputText():source', this.source);
-			console.log('outputText():Text', this.source.substring(startPos, endPos));
+			// console.log('outputText():Text', this.source.substring(startPos, endPos));
+			// eslint-disable-next-line no-undef
+			if (typeof i18nManager !== 'undefined') {
+				// eslint-disable-next-line no-undef
+				const os = i18nManager.typeB.replaceOutputText(this.source.substring(startPos, endPos));
+				jQuery(destination).append(document.createTextNode(os));
+				return;
+			}
 			jQuery(destination).append(document.createTextNode(this.source.substring(startPos, endPos)));
 		}
 
