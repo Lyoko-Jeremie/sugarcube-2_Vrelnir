@@ -20,6 +20,7 @@ const CONFIG = {
 	js : {
 		files : [
 			// i18n framework insert here
+			'i18n/node_modules/jszip/dist/jszip.js',
 			'i18n/dist/TypeA.js',
 			'i18n/dist/TypeB.js',
 			// I18NManager must in the end of i18n framework
