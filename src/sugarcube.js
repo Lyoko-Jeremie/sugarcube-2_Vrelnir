@@ -240,7 +240,7 @@ jQuery(() => {
 		// inject i18n on there
 		if (typeof i18nManager !== 'undefined') {
 			// eslint-disable-next-line no-undef
-			i18nManager.loadTranslateData(['Remote', 'ValueObject', 'ValueZip']);
+			i18nManager.loadTranslateData([ 'ValueZip', 'Remote',  /* 'ValueObject', */ ]);
 			// eslint-disable-next-line no-undef
 			i18nManager.isInited.then(() => {
 				initProcess();
