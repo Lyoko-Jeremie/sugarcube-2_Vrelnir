@@ -19,6 +19,11 @@
 const CONFIG = {
 	js : {
 		files : [
+			// i18n framework insert here
+			'i18n/dist/TypeA.js',
+			'i18n/dist/TypeB.js',
+			// I18NManager must in the end of i18n framework
+			'i18n/dist/I18NManager.js',
 			// The ordering herein is significant.
 			'src/lib/alert.js',
 			'src/lib/patterns.js',
@@ -62,11 +67,6 @@ const CONFIG = {
 			'src/uibar.js',
 			'src/debugbar.js',
 			'src/loadscreen.js',
-			// i18n framework insert here
-			'i18n/dist/TypeA.js',
-			'i18n/dist/TypeB.js',
-			// I18NManager must in the end of i18n framework
-			'i18n/dist/I18NManager.js',
 			'src/sugarcube.js'
 		],
 		wrap : {

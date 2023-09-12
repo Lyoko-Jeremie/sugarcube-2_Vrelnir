@@ -231,12 +231,12 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 			// console.log('outputText():source', this.source);
 			// console.log('outputText():Text', this.source.substring(startPos, endPos));
 			// eslint-disable-next-line no-undef
-			if (typeof i18nManager !== 'undefined') {
-				// eslint-disable-next-line no-undef
-				const os = i18nManager.typeB.replaceOutputText(this.source.substring(startPos, endPos));
-				jQuery(destination).append(document.createTextNode(os));
-				return;
-			}
+			// if (typeof i18nManager !== 'undefined') {
+			// 	// eslint-disable-next-line no-undef
+			// 	const os = i18nManager.typeB.replaceOutputText(this.source.substring(startPos, endPos));
+			// 	jQuery(destination).append(document.createTextNode(os));
+			// 	return;
+			// }
 			jQuery(destination).append(document.createTextNode(this.source.substring(startPos, endPos)));
 		}
 
