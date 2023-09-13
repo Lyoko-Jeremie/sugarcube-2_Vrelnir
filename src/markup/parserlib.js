@@ -191,6 +191,7 @@
 									that an uncaught exception is thrown during the handler call.
 								*/
 								try {
+									// console.log('macro.handler.call', macro, this.context);
 									macro.handler.call(this.context);
 									/*
 										QUESTION: Swap to the following, which passes macro arguments in

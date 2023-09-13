@@ -25,6 +25,9 @@ var Macro = (() => { // eslint-disable-line no-unused-vars, no-var
 		Macros Functions.
 	*******************************************************************************************************************/
 	function macrosAdd(name, def) {
+		// eslint-disable-next-line no-undef
+		// console.log('macrosAdd [', Wikifier.getPassageTitleLast(), '] [', name, '] ', def);
+
 		if (Array.isArray(name)) {
 			name.forEach(name => macrosAdd(name, def));
 			return;
@@ -43,12 +46,45 @@ var Macro = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		try {
 			if (typeof def === 'object') {
+				if (def.handler && !def.OriginHandlerPassageQBalance) {
+					// wrap the handler to operate Wikifier.lastPassageQ
+
+					/* eslint-disable no-param-reassign */
+					/* eslint-disable no-undef */
+					def.OriginHandlerPassageQBalance = def.handler;
+					def.macrosName = name;
+					def.PassageObj = Wikifier.getPassageObjLast();
+					def.PassageTitle = Wikifier.getPassageTitleLast();
+					def.handler = function (...args) {
+						const pIn = Wikifier.lastPassageQPush(
+							def.PassageObj,
+							def.PassageTitle
+						);
+
+						def.OriginHandlerPassageQBalance.apply(this, args);
+
+						const pOut = Wikifier.lastPassageQPop();
+
+						if (pIn !== pOut) {
+							console.error('macro handler lastPassageQ not balance !!!', [pIn, pOut]);
+						}
+					};
+					/* eslint-enable no-undef */
+					/* eslint-enable no-param-reassign */
+				}
+
 				// Add the macro definition.
 				//
 				// NOTE: Since `macrosGet()` may return legacy macros, we add the `_MACRO_API`
 				// flag to (modern) API macros, so that the macro formatter will know how to
 				// call the macro.  This should be removed in v3.
-				_macros[name] = Object.assign(Object.create(null), def, { _MACRO_API : true });
+				_macros[name] = Object.assign(Object.create(null), def, {
+					_MACRO_API   : true,
+					// eslint-disable-next-line no-undef
+					passageTitle : Wikifier.getPassageTitleLast(),
+					// eslint-disable-next-line no-undef
+					passageObj   : Wikifier.getPassageObjLast()
+				});
 			}
 			else {
 				// Add the macro alias.

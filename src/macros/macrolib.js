@@ -3777,7 +3777,6 @@
 
 			try {
 				const macroThis = this;
-				console.log('Macro widget macroThis', widgetName, macroThis);
 				const widgetDef = {
 					isWidget : true,
 					handler  : (function (widgetCode) {
@@ -3822,7 +3821,6 @@
 								const resFrag = document.createDocumentFragment();
 								const errList = [];
 
-								console.log('Macro widget macroThis in widget:', widgetName, macroThis);
 								// Wikify the widget's code.
 								new Wikifier(resFrag, widgetCode, undefined, macroThis.passageObj);
 
