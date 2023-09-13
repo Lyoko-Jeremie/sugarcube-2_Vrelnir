@@ -186,6 +186,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		*/
 		Story.getAllInit().forEach(passage => {
 			try {
+				console.log('engineStart() Story.getAllInit().forEach');
 				const debugBuffer = Wikifier.wikifyEval(passage.text, passage);
 
 				if (Config.debug) {
@@ -211,6 +212,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		*/
 		if (Story.has('StoryInit')) {
 			try {
+				console.log('engineStart() Story Execute the StoryInit special passage.');
 				const debugBuffer = Wikifier.wikifyEval(Story.get('StoryInit').text, Story.get('StoryInit'));
 
 				if (Config.debug) {

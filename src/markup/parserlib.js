@@ -54,7 +54,7 @@
 					.get(0),
 				this.terminator,
 				undefined,
-				this.passageObj
+				w.passageObj
 			);
 		}
 	});
@@ -99,7 +99,7 @@
 					destStack[destStack.length - 1],
 					this.terminator,
 					undefined,
-					this.passageObj
+					w.passageObj
 				);
 				jQuery(document.createElement('br')).appendTo(destStack[destStack.length - 1]);
 
@@ -177,9 +177,10 @@
 									name,
 									args,
 									payload,
-									source : w.source.slice(matchStart, w.nextMatch),
-									parent : this.context,
-									parser : w
+									source     : w.source.slice(matchStart, w.nextMatch),
+									parent     : this.context,
+									parser     : w,
+									passageObj : w.passageObj
 								});
 
 								/*
@@ -903,27 +904,27 @@
 		handler(w) {
 			switch (w.matchText) {
 			case "''":
-				w.subWikify(jQuery(document.createElement('strong')).appendTo(w.output).get(0), "''", undefined, this.passageObj);
+				w.subWikify(jQuery(document.createElement('strong')).appendTo(w.output).get(0), "''", undefined, w.passageObj);
 				break;
 
 			case '//':
-				w.subWikify(jQuery(document.createElement('em')).appendTo(w.output).get(0), '//', undefined, this.passageObj);
+				w.subWikify(jQuery(document.createElement('em')).appendTo(w.output).get(0), '//', undefined, w.passageObj);
 				break;
 
 			case '__':
-				w.subWikify(jQuery(document.createElement('u')).appendTo(w.output).get(0), '__', undefined, this.passageObj);
+				w.subWikify(jQuery(document.createElement('u')).appendTo(w.output).get(0), '__', undefined, w.passageObj);
 				break;
 
 			case '^^':
-				w.subWikify(jQuery(document.createElement('sup')).appendTo(w.output).get(0), '\\^\\^', undefined, this.passageObj);
+				w.subWikify(jQuery(document.createElement('sup')).appendTo(w.output).get(0), '\\^\\^', undefined, w.passageObj);
 				break;
 
 			case '~~':
-				w.subWikify(jQuery(document.createElement('sub')).appendTo(w.output).get(0), '~~', undefined, this.passageObj);
+				w.subWikify(jQuery(document.createElement('sub')).appendTo(w.output).get(0), '~~', undefined, w.passageObj);
 				break;
 
 			case '==':
-				w.subWikify(jQuery(document.createElement('s')).appendTo(w.output).get(0), '==', undefined, this.passageObj);
+				w.subWikify(jQuery(document.createElement('s')).appendTo(w.output).get(0), '==', undefined, w.passageObj);
 				break;
 
 			case '{{{':
@@ -979,10 +980,10 @@
 			if (blockLevel) {
 				// Skip the leading and, if it exists, trailing newlines.
 				w.nextMatch += blockMatch[0].length;
-				w.subWikify($el[0], `\\n?${this.terminator}`, undefined, this.passageObj);
+				w.subWikify($el[0], `\\n?${this.terminator}`, undefined, w.passageObj);
 			}
 			else {
-				w.subWikify($el[0], this.terminator, undefined, this.passageObj);
+				w.subWikify($el[0], this.terminator, undefined, w.passageObj);
 			}
 		}
 	});
@@ -1069,7 +1070,7 @@
 					).output,
 					stringFrom(result),
 					undefined,
-					this.passageObj
+					w.passageObj
 				);
 			}
 		}
@@ -1119,7 +1120,7 @@
 					).output,
 					result,
 					undefined,
-					this.passageObj
+					w.passageObj
 				);
 			}
 		}
@@ -1141,7 +1142,7 @@
 				jQuery(document.createElement(`h${w.matchLength}`)).appendTo(w.output).get(0),
 				this.terminator,
 				undefined,
-				this.passageObj
+				w.passageObj
 			);
 		}
 	});
@@ -1199,7 +1200,7 @@
 								$rowContainer[0],
 								this.rowTerminator,
 								undefined,
-								this.passageObj
+								w.passageObj
 							);
 						}
 						else {
@@ -1287,7 +1288,7 @@
 							$cell[0],
 							this.cellTerminator,
 							undefined,
-							this.passageObj
+							w.passageObj
 						);
 
 						if (w.matchText.substr(w.matchText.length - 2, 1) === ' ') {
@@ -1386,7 +1387,7 @@
 							.get(0),
 						this.terminator,
 						undefined,
-						this.passageObj
+						w.passageObj
 					);
 				}
 			} while (matched);
@@ -1779,7 +1780,7 @@
 								el,
 								terminator,
 								{ ignoreTerminatorCase : true },
-								this.passageObj
+								w.passageObj
 							);
 						}
 						finally {

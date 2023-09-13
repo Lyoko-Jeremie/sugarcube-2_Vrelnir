@@ -56,7 +56,7 @@
 					this.addShadow(varName);
 				}
 
-				new Wikifier(this.output, this.payload[0].contents);
+				new Wikifier(this.output, this.payload[0].contents, undefined, this.passageObj);
 			}
 			finally {
 				// Revert the variable shadowing.
@@ -328,7 +328,12 @@
 				Wikify the contents, after removing all leading & trailing newlines and compacting
 				all internal sequences of newlines into single spaces.
 			*/
-			new Wikifier(this.output, this.payload[0].contents.replace(/^\n+|\n+$/g, '').replace(/\n+/g, ' '));
+			new Wikifier(
+				this.output,
+				this.payload[0].contents.replace(/^\n+|\n+$/g, '').replace(/\n+/g, ' '),
+				undefined,
+				this.passageObj
+			);
 		}
 	});
 
@@ -347,7 +352,12 @@
 				const result = stringFrom(Scripting.evalJavaScript(this.args.full));
 
 				if (result !== null) {
-					new Wikifier(this.output, this.name === '-' ? Util.escape(result) : result);
+					new Wikifier(
+						this.output,
+						this.name === '-' ? Util.escape(result) : result,
+						undefined,
+						this.passageObj
+					);
 				}
 			}
 			catch (ex) {
@@ -365,7 +375,7 @@
 
 		handler() {
 			const frag = document.createDocumentFragment();
-			new Wikifier(frag, this.payload[0].contents.trim());
+			new Wikifier(frag, this.payload[0].contents.trim(), undefined, this.passageObj);
 
 			if (Config.debug) {
 				// Custom debug view setup.
@@ -539,6 +549,7 @@
 			// Generate our unique ID.
 			const selfId = ++this.self.typeId;
 
+			const macroThis = this;
 			// Push our typing handler onto the queue.
 			TempState.macroTypeQueue.push({
 				id : selfId,
@@ -558,7 +569,7 @@
 					}
 
 					// Wikify the contents into `$wrapper`.
-					new Wikifier($wrapper, contents);
+					new Wikifier($wrapper, contents, undefined, macroThis.passageObj);
 
 					// Cache info about the current turn.
 					const passage = State.passage;
@@ -777,7 +788,7 @@
 					// Conditional test.
 					if (this.payload[i].name === 'else' || !!evalJavaScript(this.payload[i].args.full)) {
 						success = true;
-						new Wikifier(this.output, this.payload[i].contents);
+						new Wikifier(this.output, this.payload[i].contents, undefined, this.passageObj);
 						break;
 					}
 					else if (Config.debug) {
@@ -895,7 +906,7 @@
 				// Case test(s).
 				if (this.payload[i].name === 'default' || this.payload[i].args.some(val => val === result)) {
 					success = true;
-					new Wikifier(this.output, this.payload[i].contents);
+					new Wikifier(this.output, this.payload[i].contents, undefined, this.passageObj);
 					break;
 				}
 				else if (Config.debug) {
@@ -1048,7 +1059,12 @@
 						return this.error(`exceeded configured maximum loop iterations (${Config.macros.maxLoopIterations})`);
 					}
 
-					new Wikifier(this.output, first ? payload.replace(/^\n/, '') : payload);
+					new Wikifier(
+						this.output,
+						first ? payload.replace(/^\n/, '') : payload,
+						undefined,
+						this.passageObj
+					);
 
 					if (first) {
 						first = false;
@@ -1108,7 +1124,12 @@
 
 					State[valueVar.type][valueVar.name] = rangeList[i][1];
 
-					new Wikifier(this.output, first ? payload.replace(/^\n/, '') : payload);
+					new Wikifier(
+						this.output,
+						first ? payload.replace(/^\n/, '') : payload,
+						undefined,
+						this.passageObj
+					);
 
 					if (first) {
 						first = false;
@@ -1282,6 +1303,7 @@
 				$link.addClass('link-internal');
 			}
 
+			const macroThis = this;
 			$link
 				.addClass(`macro-${this.name}`)
 				.ariaClick({
@@ -1290,7 +1312,7 @@
 					one       : passage != null // lazy equality for null
 				}, this.createShadowWrapper(
 					this.payload[0].contents !== ''
-						? () => Wikifier.wikifyEval(this.payload[0].contents.trim())
+						? () => Wikifier.wikifyEval(this.payload[0].contents.trim(), macroThis.passageObj)
 						: null,
 					passage != null // lazy equality for null
 						? () => Engine.play(passage)
@@ -1615,6 +1637,7 @@
 			const $insert    = jQuery(document.createElement('span'));
 			const transition = this.args.length > 1 && this.self.t8nRe.test(this.args[1]);
 
+			const macroThis = this;
 			$link
 				.wikiWithOptions({ profile : 'core' }, this.args[0])
 				.addClass(`link-internal macro-${this.name}`)
@@ -1634,7 +1657,7 @@
 
 						if (this.payload[0].contents !== '') {
 							const frag = document.createDocumentFragment();
-							new Wikifier(frag, this.payload[0].contents);
+							new Wikifier(frag, this.payload[0].contents, undefined, macroThis.passageObj);
 							$insert.append(frag);
 						}
 
@@ -3474,10 +3497,11 @@
 				.addClass(`macro-${this.name}`)
 				.appendTo(this.output);
 
+			const macroThis = this;
 			// Register the timer.
 			this.self.registerInterval(this.createShadowWrapper(() => {
 				const frag = document.createDocumentFragment();
-				new Wikifier(frag, this.payload[0].contents);
+				new Wikifier(frag, this.payload[0].contents, undefined, macroThis.passageObj);
 
 				let $output = $wrapper;
 
@@ -3641,10 +3665,11 @@
 				.addClass(`macro-${this.name}`)
 				.appendTo(this.output);
 
+			const macroThis = this;
 			// Register the timer.
 			this.self.registerTimeout(this.createShadowWrapper(item => {
 				const frag = document.createDocumentFragment();
-				new Wikifier(frag, item.content);
+				new Wikifier(frag, item.content, undefined, macroThis.passageObj);
 
 				// Output.
 				let $output = $wrapper;
@@ -3730,8 +3755,12 @@
 		tags : null,
 
 		handler() {
+			console.warn('Macro widget macroThis', this.args[0], this);
 			if (this.args.length === 0) {
 				return this.error('no widget name specified');
+			}
+			if (!this.passageObj)  {
+				console.error('Macro widget passageObj cannot find passageObj');
 			}
 
 			const widgetName = this.args[0];
@@ -3747,6 +3776,8 @@
 			}
 
 			try {
+				const macroThis = this;
+				console.log('Macro widget macroThis', widgetName, macroThis);
 				const widgetDef = {
 					isWidget : true,
 					handler  : (function (widgetCode) {
@@ -3791,8 +3822,9 @@
 								const resFrag = document.createDocumentFragment();
 								const errList = [];
 
+								console.log('Macro widget macroThis in widget:', widgetName, macroThis);
 								// Wikify the widget's code.
-								new Wikifier(resFrag, widgetCode);
+								new Wikifier(resFrag, widgetCode, undefined, macroThis.passageObj);
 
 								// Carry over the output, unless there were errors.
 								Array.from(resFrag.querySelectorAll('.error')).forEach(errEl => {
