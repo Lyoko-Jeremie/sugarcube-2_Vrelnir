@@ -34,7 +34,7 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 
 			// Wikify the content of the given source passage into a fragment.
 			const frag = document.createDocumentFragment();
-			new Wikifier(frag, Story.get(passage).processText().trim());
+			new Wikifier(frag, Story.get(passage).processText().trim(), undefined, Story.get(passage));
 
 			// Gather the text of any error elements within the fragment…
 			const errors = [...frag.querySelectorAll('.error')]

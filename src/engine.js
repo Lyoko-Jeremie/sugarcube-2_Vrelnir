@@ -186,7 +186,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		*/
 		Story.getAllInit().forEach(passage => {
 			try {
-				const debugBuffer = Wikifier.wikifyEval(passage.text);
+				const debugBuffer = Wikifier.wikifyEval(passage.text, passage);
 
 				if (Config.debug) {
 					const debugView = new DebugView(
@@ -211,7 +211,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		*/
 		if (Story.has('StoryInit')) {
 			try {
-				const debugBuffer = Wikifier.wikifyEval(Story.get('StoryInit').text);
+				const debugBuffer = Wikifier.wikifyEval(Story.get('StoryInit').text, Story.get('StoryInit'));
 
 				if (Config.debug) {
 					const debugView = new DebugView(
@@ -483,7 +483,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		if (Story.has('PassageReady')) {
 			try {
-				passageReadyOutput = Wikifier.wikifyEval(Story.get('PassageReady').text);
+				passageReadyOutput = Wikifier.wikifyEval(Story.get('PassageReady').text, Story.get('PassageReady'));
 			}
 			catch (ex) {
 				console.error(ex);
@@ -530,7 +530,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		// Render the `PassageHeader` passage, if it exists, into the passage element.
 		if (Story.has('PassageHeader')) {
-			new Wikifier(passageEl, Story.get('PassageHeader').processText());
+			new Wikifier(passageEl, Story.get('PassageHeader').processText(), undefined, Story.get('PassageHeader'));
 		}
 
 		// Render the passage into its element.
@@ -538,7 +538,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		// Render the `PassageFooter` passage, if it exists, into the passage element.
 		if (Story.has('PassageFooter')) {
-			new Wikifier(passageEl, Story.get('PassageFooter').processText());
+			new Wikifier(passageEl, Story.get('PassageFooter').processText(), undefined, Story.get('PassageHeader'));
 		}
 
 		// Execute post-render events and tasks.
@@ -629,7 +629,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		// Execute post-display events, tasks, and the `PassageDone` special passage.
 		if (Story.has('PassageDone')) {
 			try {
-				passageDoneOutput = Wikifier.wikifyEval(Story.get('PassageDone').text);
+				passageDoneOutput = Wikifier.wikifyEval(Story.get('PassageDone').text, Story.get('PassageDone'));
 			}
 			catch (ex) {
 				console.error(ex);
@@ -652,7 +652,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (_updating !== null) {
 			_updating.forEach(pair => {
 				jQuery(pair.element).empty();
-				new Wikifier(pair.element, Story.get(pair.passage).processText().trim());
+				new Wikifier(pair.element, Story.get(pair.passage).processText().trim(), undefined, pair.passage);
 			});
 		}
 		else if (Config.ui.updateStoryElements) {

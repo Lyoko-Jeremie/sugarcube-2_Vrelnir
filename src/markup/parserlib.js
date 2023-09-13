@@ -52,7 +52,9 @@
 				jQuery(document.createElement('blockquote'))
 					.appendTo(w.output)
 					.get(0),
-				this.terminator
+				this.terminator,
+				undefined,
+				this.passageObj
 			);
 		}
 	});
@@ -93,7 +95,12 @@
 				}
 
 				curLevel = newLevel;
-				w.subWikify(destStack[destStack.length - 1], this.terminator);
+				w.subWikify(
+					destStack[destStack.length - 1],
+					this.terminator,
+					undefined,
+					this.passageObj
+				);
 				jQuery(document.createElement('br')).appendTo(destStack[destStack.length - 1]);
 
 				this.lookahead.lastIndex = w.nextMatch;
@@ -896,27 +903,27 @@
 		handler(w) {
 			switch (w.matchText) {
 			case "''":
-				w.subWikify(jQuery(document.createElement('strong')).appendTo(w.output).get(0), "''");
+				w.subWikify(jQuery(document.createElement('strong')).appendTo(w.output).get(0), "''", undefined, this.passageObj);
 				break;
 
 			case '//':
-				w.subWikify(jQuery(document.createElement('em')).appendTo(w.output).get(0), '//');
+				w.subWikify(jQuery(document.createElement('em')).appendTo(w.output).get(0), '//', undefined, this.passageObj);
 				break;
 
 			case '__':
-				w.subWikify(jQuery(document.createElement('u')).appendTo(w.output).get(0), '__');
+				w.subWikify(jQuery(document.createElement('u')).appendTo(w.output).get(0), '__', undefined, this.passageObj);
 				break;
 
 			case '^^':
-				w.subWikify(jQuery(document.createElement('sup')).appendTo(w.output).get(0), '\\^\\^');
+				w.subWikify(jQuery(document.createElement('sup')).appendTo(w.output).get(0), '\\^\\^', undefined, this.passageObj);
 				break;
 
 			case '~~':
-				w.subWikify(jQuery(document.createElement('sub')).appendTo(w.output).get(0), '~~');
+				w.subWikify(jQuery(document.createElement('sub')).appendTo(w.output).get(0), '~~', undefined, this.passageObj);
 				break;
 
 			case '==':
-				w.subWikify(jQuery(document.createElement('s')).appendTo(w.output).get(0), '==');
+				w.subWikify(jQuery(document.createElement('s')).appendTo(w.output).get(0), '==', undefined, this.passageObj);
 				break;
 
 			case '{{{':
@@ -972,10 +979,10 @@
 			if (blockLevel) {
 				// Skip the leading and, if it exists, trailing newlines.
 				w.nextMatch += blockMatch[0].length;
-				w.subWikify($el[0], `\\n?${this.terminator}`);
+				w.subWikify($el[0], `\\n?${this.terminator}`, undefined, this.passageObj);
 			}
 			else {
-				w.subWikify($el[0], this.terminator);
+				w.subWikify($el[0], this.terminator, undefined, this.passageObj);
 			}
 		}
 	});
@@ -1060,7 +1067,9 @@
 						? new DebugView(w.output, 'variable', w.matchText, w.matchText) // Debug view setup.
 						: w
 					).output,
-					stringFrom(result)
+					stringFrom(result),
+					undefined,
+					this.passageObj
 				);
 			}
 		}
@@ -1108,7 +1117,9 @@
 						? new DebugView(w.output, 'template', w.matchText, w.matchText) // Debug view setup.
 						: w
 					).output,
-					result
+					result,
+					undefined,
+					this.passageObj
 				);
 			}
 		}
@@ -1128,7 +1139,9 @@
 
 			w.subWikify(
 				jQuery(document.createElement(`h${w.matchLength}`)).appendTo(w.output).get(0),
-				this.terminator
+				this.terminator,
+				undefined,
+				this.passageObj
 			);
 		}
 	});
@@ -1182,7 +1195,12 @@
 						if (curRowType === 'c') {
 							$rowContainer.css('caption-side', rowCount === 0 ? 'top' : 'bottom');
 							w.nextMatch += 1;
-							w.subWikify($rowContainer[0], this.rowTerminator);
+							w.subWikify(
+								$rowContainer[0],
+								this.rowTerminator,
+								undefined,
+								this.passageObj
+							);
 						}
 						else {
 							this.rowHandler(
@@ -1265,7 +1283,12 @@
 							curColCount = 1;
 						}
 
-						w.subWikify($cell[0], this.cellTerminator);
+						w.subWikify(
+							$cell[0],
+							this.cellTerminator,
+							undefined,
+							this.passageObj
+						);
 
 						if (w.matchText.substr(w.matchText.length - 2, 1) === ' ') {
 							spaceRight = true;
@@ -1361,7 +1384,9 @@
 						jQuery(document.createElement('li'))
 							.appendTo(destStack[destStack.length - 1])
 							.get(0),
-						this.terminator
+						this.terminator,
+						undefined,
+						this.passageObj
 					);
 				}
 			} while (matched);
@@ -1750,7 +1775,12 @@
 						*/
 						try {
 							Wikifier.Option.push({ nobr : isNobr });
-							w.subWikify(el, terminator, { ignoreTerminatorCase : true });
+							w.subWikify(
+								el,
+								terminator,
+								{ ignoreTerminatorCase : true },
+								this.passageObj
+							);
 						}
 						finally {
 							Wikifier.Option.pop();

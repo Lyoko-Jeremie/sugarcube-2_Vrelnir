@@ -210,7 +210,12 @@ var Passage = (() => { // eslint-disable-line no-unused-vars, no-var
 		render(options) {
 			// Wikify the passage into a document fragment.
 			const frag = document.createDocumentFragment();
-			new Wikifier(frag, this.processText(), options);
+			new Wikifier(frag, this.processText(), options, this);
+
+			const div = document.createElement('div');
+			div.appendChild(frag.cloneNode(true));
+			console.log('frag HTML', div.innerHTML.trim());
+			console.log('frag text', frag.cloneNode(true).textContent.trim());
 
 			// Update the excerpt cache to reflect the rendered text.
 			this._excerpt = Passage.getExcerptFromNode(frag);

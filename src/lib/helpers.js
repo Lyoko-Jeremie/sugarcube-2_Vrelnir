@@ -289,7 +289,7 @@ var { // eslint-disable-line no-var
 
 		for (let i = 0, iend = ids.length; i < iend; ++i) {
 			if (Story.has(ids[i])) {
-				new Wikifier(el, Story.get(ids[i]).processText().trim());
+				new Wikifier(el, Story.get(ids[i]).processText().trim(), undefined, Story.get(ids[i]));
 				return el;
 			}
 		}
