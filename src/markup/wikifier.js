@@ -68,7 +68,8 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 				name = name ? (_passageObjLast ? _passageObjLast.title : undefined) : undefined;
 
 				const lppt = Wikifier.getLastPossiblePassageTitle();
-				if (!name && !_passageTitleLast /* && !lppt */) {
+				if (!name && !_passageTitleLast && !lppt) {
+					// eslint-disable-next-line no-undef
 					console.warn('Wikifier.constructor(): No name.', [name, _callDepth, structuredClone(_lastPassageQ), _passageTitleLast, structuredClone(_passageObjLast), passageObj, passageTitle, lppt]);
 				}
 
