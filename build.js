@@ -68,7 +68,9 @@ const CONFIG = {
 			'src/uibar.js',
 			'src/debugbar.js',
 			'src/loadscreen.js',
-			'src/sugarcube.js'
+			'src/sugarcube.js',
+			// cs2 locale init as chs
+			'locale/chs.js'
 		],
 		wrap : {
 			intro : 'src/templates/intro.js',
