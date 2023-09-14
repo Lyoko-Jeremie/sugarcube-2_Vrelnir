@@ -261,12 +261,8 @@ jQuery(() => {
 	// inject ModLoader on there
 	if (typeof window.modSC2DataManager !== 'undefined') {
 		window.modSC2DataManager.startInit()
-			.then(() => {
-				window.jsPreloader.startLoad();
-			})
-			.then(() => {
-				mainStart();
-			})
+			.then(() => window.jsPreloader.startLoad())
+			.then(() => mainStart())
 			.catch(err => {
 				console.error(err);
 			});
