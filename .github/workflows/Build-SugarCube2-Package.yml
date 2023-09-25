@@ -3,9 +3,9 @@ name: Build SugarCube2
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "TS" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "TS" ]
   workflow_dispatch:
 
 jobs:
