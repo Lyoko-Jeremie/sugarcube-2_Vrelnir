@@ -1,6 +1,6 @@
 [submodule "i18n"]
 	path = i18n
-	url = ./sugarcube-2-i18n.git
+	url = ../sugarcube-2-i18n.git
 [submodule "ModLoader"]
 	path = ModLoader
-	url = ./sugarcube-2-ModLoader.git
+	url = ../sugarcube-2-ModLoader.git
