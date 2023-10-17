@@ -1707,6 +1707,9 @@
 			const tagMatch = this.tagRe.exec(w.matchText);
 			const tag      = tagMatch && tagMatch[1];
 			const tagName  = tag && tag.toLowerCase();
+			// if (tagName.startsWith('img')) {
+			// 	console.log('************************** Wikifier.Parser htmlTag w', [tagName, w, w.output.tagName, w.matchText]);
+			// }
 
 			if (tagName) {
 				const isVoid = this.voidTags.includes(tagName) || w.matchText.endsWith('/>');
@@ -1729,6 +1732,9 @@
 					let debugView;
 
 					el.innerHTML = w.matchText;
+					// if (tagName.startsWith('img')) {
+					// 	console.log('Wikifier.Parser htmlTag innerHTML', el.cloneNode(true));
+					// }
 
 					/*
 						NOTE: The use of a `while` statement here is curious, however,
@@ -1736,7 +1742,13 @@
 					*/
 					while (el.firstChild) {
 						el = el.firstChild;
+						// if (tagName.startsWith('img')) {
+						// 	console.log('Wikifier.Parser htmlTag while firstChild', el.cloneNode(true));
+						// }
 					}
+					// if (tagName.startsWith('img')) {
+					// 	console.log('Wikifier.Parser htmlTag firstChild', el.cloneNode(true));
+					// }
 
 					try {
 						this.processAttributeDirectives(el);
@@ -1798,6 +1810,24 @@
 						}
 					}
 
+					// if (tagName.startsWith('img')) {
+					// 	console.log('************************** Wikifier.Parser htmlTag output', el.cloneNode(true), el.tagName, el.getAttribute('src'));
+					// }
+
+					if (typeof window.modSC2DataManager !== 'undefined' &&
+						typeof window.modSC2DataManager.getHtmlTagSrcHook?.()?.doHook !== 'undefined') {
+						if (tagName === 'img' && !el.getAttribute('src')?.startsWith('data:')) {
+							// need check the src is not "data:" URI
+							el.setAttribute('ML-src', el.getAttribute('src'));
+							el.removeAttribute('src');
+							// call img loader on there
+							window.modSC2DataManager.getHtmlTagSrcHook().doHook(el).catch(E => console.error(E));
+						}
+					}
+					// if (tagName.startsWith('img')) {
+					// 	console.log('************************** Wikifier.Parser htmlTag removeAttribute', el.cloneNode(true));
+					// }
+
 					/*
 						NOTE: The use of `cloneNode(true)` here for `<track>` elements
 						is necessary to workaround a poorly understood rehoming issue.
@@ -1820,6 +1850,9 @@
 			// members of said collection if any directives are found.
 			[...el.attributes].forEach(({ name, value }) => {
 				const evalShorthand = name[0] === '@';
+				// if (el.tagName === 'IMG') {
+				// 	console.log('Wikifier.Parser htmlTag processAttributeDirectives', el.cloneNode(true));
+				// }
 
 				if (evalShorthand || name.startsWith('sc-eval:')) {
 					const newName = name.slice(evalShorthand ? 1 : 8); // Remove eval directive prefix.
@@ -1848,6 +1881,9 @@
 							attribute names that, after removing the directive prefix, are
 							unpalatable to `setAttribute()`.
 						*/
+						// if (newName === 'src') {
+						// 	console.log('Wikifier.Parser htmlTag processAttributeDirectives src', [el, result]);
+						// }
 						el.setAttribute(newName, result);
 						el.removeAttribute(name);
 					}
@@ -1860,6 +1896,9 @@
 
 		processDataAttributes(el, tagName) {
 			let passage = el.getAttribute('data-passage');
+			// if (el.tagName === 'IMG') {
+			// 	console.log('Wikifier.Parser htmlTag processDataAttributes', el.cloneNode(true));
+			// }
 
 			if (passage == null) { // lazy equality for null
 				return;
@@ -1905,6 +1944,9 @@
 						}
 
 						if (passage.tags.includes(twineTag)) {
+							// if (parentName !== 'picture') {
+							// 	console.log('Wikifier.Parser htmlTag processDataAttributes src', passage.text.trim());
+							// }
 							el[parentName === 'picture' ? 'srcset' : 'src'] = passage.text.trim();
 						}
 					}
