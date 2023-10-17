@@ -15,6 +15,10 @@
 /* eslint-disable strict */
 
 (function () {
+	if (navigator.language !== 'zh-CN') {
+		return;
+	}
+
 	/* General. */
 	l10nStrings.identity = '游戏';
 	l10nStrings.aborting = '终止';
