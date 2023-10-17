@@ -76,6 +76,21 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 				// eslint-disable-next-line no-undef,no-param-reassign
 				source = i18nManager.typeB.replaceInputStoryScript(source, name, _passageTitleLast, lppt);
 			}
+			if (false) {
+				// test
+				let name = passageObj ? passageObj.title : passageTitle;
+				// eslint-disable-next-line no-nested-ternary
+				name = name ? (_passageObjLast ? _passageObjLast.title : undefined) : undefined;
+
+				const lppt = Wikifier.getLastPossiblePassageTitle();
+				if (!name && !_passageTitleLast && !lppt) {
+					// eslint-disable-next-line no-undef
+					console.warn('Wikifier.constructor(): No name.', [name, _callDepth, structuredClone(_lastPassageQ), _passageTitleLast, structuredClone(_passageObjLast), passageObj, passageTitle, lppt]);
+				}
+
+				// eslint-disable-next-line no-undef,no-param-reassign
+				console.log('[source, _callDepth, _lastPassageQ, name, _passageTitleLast, lppt]', [source, _callDepth, structuredClone(_lastPassageQ), name, _passageTitleLast, lppt]);
+			}
 			if (Wikifier.Parser.Profile.isEmpty()) {
 				Wikifier.Parser.Profile.compile();
 			}
