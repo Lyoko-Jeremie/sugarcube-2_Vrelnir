@@ -145,7 +145,7 @@
 		context : null, // last execution context object (top-level macros, hierarchically, have a null context)
 
 		handler(w) {
-			const matchStart = (this.lookahead.lastIndex = w.matchStart);
+			const matchStart = this.lookahead.lastIndex = w.matchStart;
 
 			if (this.parseTag(w)) {
 			/*
@@ -405,7 +405,7 @@
 			if (typeof macro.skipArgs !== 'undefined') {
 				const sa = macro.skipArgs;
 
-				return (typeof sa === 'boolean' && sa) || (Array.isArray(sa) && sa.includes(tagName));
+				return typeof sa === 'boolean' && sa || Array.isArray(sa) && sa.includes(tagName);
 			}
 			else if (typeof macro.skipArg0 !== 'undefined') {
 			/* legacy */
