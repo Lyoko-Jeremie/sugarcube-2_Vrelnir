@@ -567,7 +567,7 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 	Object.defineProperties(Wikifier, {
 		helpers        : { value : {} },
 		/* Global exit flag */
-		stopWikify     : { value : false },
+		stopWikify     : { value : false, writable : true },
 		/*
 			Legacy Aliases.
 		*/
