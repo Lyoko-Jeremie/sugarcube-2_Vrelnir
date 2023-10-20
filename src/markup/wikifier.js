@@ -20,6 +20,7 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 
 	// Wikifier call depth.
 	let _callDepth = 0;
+	let _stopWikify = false;
 
 
 	/*******************************************************************************************************************
@@ -100,6 +101,9 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 		}
 
 		subWikify(output, terminator, options) {
+			// Placed at top to prevent any execution
+			if (_stopWikify) return;
+
 			// Cache and temporarily replace the current output buffer.
 			const oldOutput = this.output;
 			this.output = output;
@@ -189,6 +193,8 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 
 					// Call the parser.
 					parsersProfile.parsers[matchingParser].handler(this);
+
+					if (_stopWikify) return;
 
 					if (TempState.break != null) { // lazy equality for null
 						break;
