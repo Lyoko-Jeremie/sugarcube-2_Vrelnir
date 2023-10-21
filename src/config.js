@@ -24,6 +24,7 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 	// State history settings.
 	let _historyControls  = true;
 	let _historyMaxStates = 40;
+	let _sessionMaxStates = 40;
 
 	// Macros settings.
 	let _macrosIfAssignmentError   = true;
@@ -131,6 +132,15 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 				if (_historyControls && value === 1) {
 					_historyControls = false;
 				}
+			},
+
+			get maxSessionStates() { return _sessionMaxStates; },
+			set maxSessionStates(value) {
+				if (!Number.isSafeInteger(value) || value < 0) {
+					throw new RangeError('Config.history.maxSessionStates must be a non-negative integer');
+				}
+
+				_sessionMaxStates = value;
 			},
 
 			// legacy

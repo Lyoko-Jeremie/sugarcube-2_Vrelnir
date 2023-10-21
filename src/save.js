@@ -84,25 +84,6 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			updated = true;
 		}
 
-		/* legacy */
-		// Update saves with old/obsolete properties.
-		if (_savesObjUpdate(saves.autosave)) {
-			updated = true;
-		}
-
-		for (let i = 0; i < saves.slots.length; ++i) {
-			if (_savesObjUpdate(saves.slots[i])) {
-				updated = true;
-			}
-		}
-
-		// Remove save stores which are empty.
-		if (_savesObjIsEmpty(saves)) {
-			storage.delete('saves');
-			updated = false;
-		}
-		/* /legacy */
-
 		// If the saves object was updated, then update the store.
 		if (updated) {
 			_savesObjSave(saves);
@@ -516,82 +497,6 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		return storage.set('saves', saves);
 	}
 
-	function _savesObjUpdate(saveObj) {
-		if (saveObj == null || typeof saveObj !== 'object') { // lazy equality for null
-			return false;
-		}
-
-		let updated = false;
-
-		/* eslint-disable no-param-reassign */
-		if (
-			   !saveObj.hasOwnProperty('state')
-			|| !saveObj.state.hasOwnProperty('delta')
-			|| !saveObj.state.hasOwnProperty('index')
-		) {
-			if (saveObj.hasOwnProperty('data')) {
-				delete saveObj.mode;
-				saveObj.state = {
-					delta : State.deltaEncode(saveObj.data)
-				};
-				delete saveObj.data;
-			}
-			else if (!saveObj.state.hasOwnProperty('delta')) {
-				delete saveObj.state.mode;
-				saveObj.state.delta = State.deltaEncode(saveObj.state.history);
-				delete saveObj.state.history;
-			}
-			else if (!saveObj.state.hasOwnProperty('index')) {
-				delete saveObj.state.mode;
-			}
-
-			saveObj.state.index = saveObj.state.delta.length - 1;
-			updated = true;
-		}
-
-		if (saveObj.state.hasOwnProperty('rseed')) {
-			saveObj.state.seed = saveObj.state.rseed;
-			delete saveObj.state.rseed;
-
-			saveObj.state.delta.forEach((_, i, delta) => {
-				if (delta[i].hasOwnProperty('rcount')) {
-					delta[i].pull = delta[i].rcount;
-					delete delta[i].rcount;
-				}
-			});
-
-			updated = true;
-		}
-
-		if (
-			   saveObj.state.hasOwnProperty('expired') && typeof saveObj.state.expired === 'number'
-			||  saveObj.state.hasOwnProperty('unique')
-			||  saveObj.state.hasOwnProperty('last')
-		) {
-			if (saveObj.state.hasOwnProperty('expired') && typeof saveObj.state.expired === 'number') {
-				delete saveObj.state.expired;
-			}
-
-			if (saveObj.state.hasOwnProperty('unique') || saveObj.state.hasOwnProperty('last')) {
-				saveObj.state.expired = [];
-
-				if (saveObj.state.hasOwnProperty('unique')) {
-					saveObj.state.expired.push(saveObj.state.unique);
-					delete saveObj.state.unique;
-				}
-
-				if (saveObj.state.hasOwnProperty('last')) {
-					saveObj.state.expired.push(saveObj.state.last);
-					delete saveObj.state.last;
-				}
-			}
-
-			updated = true;
-		}
-		/* eslint-enable no-param-reassign */
-
-		return updated;
-	}
 
 	function _marshal(supplemental, details) {
 		if (DEBUG) { console.log(`[Save/_marshal(…, { type : '${details.type}' })]`); }
@@ -611,8 +516,20 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		_onSaveHandlers.forEach(fn => fn(saveObj, details));
 
-		// Delta encode the state history and delete the non-encoded property.
-		saveObj.state.delta = State.deltaEncode(saveObj.state.history);
+		// jsondiffpatch can not handle functions assigned to State.variables
+		// fall back to old delta format if any weirdness happens
+		try {
+			// write the oldest history frame to delta for compatibility with old versions, then code jdelta separately
+			saveObj.state.delta = [saveObj.state.history[0]];
+			saveObj.state.jdelta = State.jdeltaEncode(saveObj.state.history);
+			// save real index and fake it for compatibility
+			saveObj.state.realIndex = saveObj.state.index;
+			saveObj.state.index = 0;
+		}
+		catch {
+			alert('jdeltaEncode failed, falling back to old deltaEncode. Please, report to DoL discord, #bug-reports');
+			saveObj.state.delta = State.deltaEncode(saveObj.state.history);
+		}
 		delete saveObj.state.history;
 
 		return saveObj;
@@ -623,18 +540,36 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		try {
 			/* eslint-disable no-param-reassign */
-			/* legacy */
-			// Update saves with old/obsolete properties.
-			_savesObjUpdate(saveObj);
-			/* /legacy */
 
 			if (!saveObj || !saveObj.hasOwnProperty('id') || !saveObj.hasOwnProperty('state')) {
 				throw new Error(L10n.get('errorSaveMissingData'));
 			}
 
 			// Delta decode the state history and delete the encoded property.
-			saveObj.state.history = State.deltaDecode(saveObj.state.delta);
-			delete saveObj.state.delta;
+			if (!saveObj.state.history) {
+				if (saveObj.state.jdelta) {
+					let corruptionTrigger = false;
+					try {
+						saveObj.state.history = State.jdeltaDecode(saveObj.state.delta, saveObj.state.jdelta);
+						// ensure that decoder didn't screw up
+						if (saveObj.state.history.find(s => typeof s !== 'object')) corruptionTrigger = true;
+					}
+					catch {
+						corruptionTrigger = true;
+					}
+					if (corruptionTrigger) {
+						alert('Corrupted jdelta detected, loading the last known state. Please, report to DoL discord, #bug-reports');
+						saveObj.state.history = saveObj.state.delta;
+						delete saveObj.state.realIndex;
+					}
+					delete saveObj.state.jdelta;
+				}
+				else if (saveObj.state.delta) {
+					saveObj.state.history = State.deltaDecode(saveObj.state.delta);
+				}
+				delete saveObj.state.delta;
+			}
+			if (saveObj.state.realIndex) saveObj.state.index = saveObj.state.realIndex;
 
 			_onLoadHandlers.forEach(fn => fn(saveObj));
 
