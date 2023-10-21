@@ -193,7 +193,9 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 					// Call the parser.
 					parsersProfile.parsers[matchingParser].handler(this);
 
-					if (Wikifier.stopWikify) return;
+					if (Wikifier.stopWikify) {
+						return;
+					}
 
 					if (TempState.break != null) { // lazy equality for null
 						break;

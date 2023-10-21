@@ -213,6 +213,10 @@
 								*/
 								}
 								finally {
+									// eslint-disable-next-line max-depth
+									if (macro.isWidget && Wikifier.stopWikify === 1) {
+										Wikifier.stopWikify = 0;
+									}
 									this.context = this.context.parent;
 								}
 							}

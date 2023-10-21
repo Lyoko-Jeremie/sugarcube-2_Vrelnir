@@ -3858,4 +3858,13 @@
 			}
 		}
 	});
+
+	/*
+		<<exit>> & <<exitAll>>
+	*/
+	Macro.add(['exit', 'exitPassage'], {
+		handler() {
+			Wikifier.stopWikify = this.name === 'exit' ? 1 : 2;
+		}
+	});
 })();
