@@ -204,6 +204,9 @@ var Passage = (() => { // eslint-disable-line no-unused-vars, no-var
 				processed = processed.replace(/^\n+|\n+$/g, '').replace(/\n+/g, ' ');
 			}
 
+			// Reset stopWikify flag at the end of a passage
+			Wikifier.stopWikify = 0;
+
 			return processed;
 		}
 
