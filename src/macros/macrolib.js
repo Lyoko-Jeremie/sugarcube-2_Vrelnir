@@ -3862,7 +3862,7 @@
 	/*
 		<<exit>> & <<exitAll>>
 	*/
-	Macro.add(['exit', 'exitPassage'], {
+	Macro.add(['exit', 'exitAll'], {
 		handler() {
 			Wikifier.stopWikify = this.name === 'exit' ? 1 : 2;
 		}
