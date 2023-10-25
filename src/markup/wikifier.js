@@ -216,6 +216,9 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		// eslint-disable-next-line no-unused-vars
 		subWikify(output, terminator, options, passageObj) {
+			// Placed at top to prevent any execution
+			if (Wikifier.stopWikify) return;
+
 			// Cache and temporarily replace the current output buffer.
 			const oldOutput = this.output;
 			this.output = output;
@@ -305,6 +308,10 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 
 					// Call the parser.
 					parsersProfile.parsers[matchingParser].handler(this);
+
+					if (Wikifier.stopWikify) {
+						return;
+					}
 
 					if (TempState.break != null) { // lazy equality for null
 						break;
@@ -696,8 +703,9 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 		Additional Static Properties.
 	*******************************************************************************************************************/
 	Object.defineProperties(Wikifier, {
-		helpers : { value : {} },
-
+		helpers        : { value : {} },
+		/* Global exit flag */
+		stopWikify     : { value : false, writable : true },
 		/*
 			Legacy Aliases.
 		*/
