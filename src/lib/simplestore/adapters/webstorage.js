@@ -6,7 +6,7 @@
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
-/* global SimpleStore, Util */
+/* global SimpleStore, Util, Config */
 
 SimpleStore.adapters.push((() => {
 	'use strict';
@@ -189,13 +189,22 @@ SimpleStore.adapters.push((() => {
 		}
 
 		static _serialize(obj) {
-			// return LZString.compressToUTF16(JSON.stringify(obj)); // TODO keep LZString as config option?
+			if (Config.saves.useLZString === 1) return LZString.compressToUTF16(JSON.stringify(obj));
 			return JSON.stringify(obj);
 		}
 
 		static _deserialize(str) {
-			// return JSON.parse(LZString.decompressFromUTF16(str));
-			return JSON.parse(str);
+			let parsedObj = null;
+			// parse as JSON string by default, switch to LZString
+			try {
+				parsedObj = JSON.parse(str);
+				if (Config.saves.useLZString === -1) Config.saves.useLZString = 0;
+			}
+			catch (ex) {
+				parsedObj = JSON.parse(LZString.decompressFromUTF16(str));
+				if (Config.saves.useLZString === -1) Config.saves.useLZString = 1;
+			}
+			return parsedObj;
 		}
 	}
 

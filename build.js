@@ -37,6 +37,7 @@ const CONFIG = {
 			'src/lib/nodetyper.js',
 			'src/lib/prngwrapper.js',
 			'src/lib/stylewrapper.js',
+			'src/util/enumfrom.js',
 			'src/lib/diff.js',
 			'src/l10n/l10n.js',
 			'src/l10n/legacy.js',
@@ -62,6 +63,8 @@ const CONFIG = {
 			'src/uibar.js',
 			'src/debugbar.js',
 			'src/loadscreen.js',
+			'src/idb_backend.js',
+			'src/hotkeys.js',
 			'src/sugarcube.js'
 		],
 		wrap : {
@@ -83,7 +86,8 @@ const CONFIG = {
 			'src/css/ui-dialog.css',
 			'src/css/ui.css',
 			'src/css/ui-bar.css',
-			'src/css/ui-debug.css'
+			'src/css/ui-debug.css',
+			'src/css/idb_backend.css'
 		]
 	},
 	libs : [

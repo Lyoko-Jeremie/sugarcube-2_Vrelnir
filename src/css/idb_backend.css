@@ -1,0 +1,195 @@
+:root {
+	/* Primary Colours
+	These are the primary greyscale colours used in the default theme
+	--000 representing the lightest white and foreground
+	--900 representing the darkest black and background
+	The rest represent colours in the range of greyscale from light to dark ala Tailwind Naming Conventions
+	*/
+	--000: #eee;
+	--100: #ddd;
+	--150: #ccc;
+	--200: #bbb;
+	--300: #aaa;
+	--400: #999;
+	--500: #888;
+	--600: #777;
+	--700: #666;
+	--750: #444;
+	--800: #333;
+	--850: #222;
+	--900: #111;
+
+	/* Accent Colours */
+	--red: #ec3535;
+	--pink: #e40081;
+	--pink-secondary: #d67caf;
+	--purple: #80f;
+	--purple-secondary: #aa4bc8;
+	--blue: #4372ff;
+	--blue-secondary: #559bc0;
+	--teal: #08c1c1;
+	--green: #38b20a;
+	--green-secondary: #7caf7c;
+	--lime: #44e342;
+	--orange: #f28500;
+	--brown: #4c2217;
+	--black: #929292;
+	--yellow: #ffd700;
+	--gold: gold;
+	--silver: silver;
+
+	/* Status Specific */
+	--lewd: #e04880;
+	--defiant: #d20000;
+	--meek: #c44b8b;
+	--brat: #b75d41;
+	--relaxed: #63719c;
+	--anxious: #973253;
+	--veteran: #956bb4;
+	--methodical: #ce7993;
+	--scarred: #d8621f;
+	--tattooed: #266568;
+	--manager: #7094b5;
+
+	/* Utility */
+	--link: #5888dd;
+	--link-hover: #8af;
+
+	/* Tooltip */
+	--tooltip-background: #1a1919;
+	--tooltip-border: #b0b0b4;
+}
+
+#savesListContainer {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--400);
+	max-width: 800px;
+}
+
+#savesListContainer .savesListRow {
+	display: flex;
+	flex-flow: row nowrap;
+	align-items: center;
+	border: 1px solid var(--400);
+	padding: 4px;
+}
+
+@media (min-width: 40rem) {
+	#savesListContainer .savesListRow { max-height: 2.4em; };
+}
+
+#savesListContainer .savesListRow .saveGroup {
+	display: flex;
+	flex-flow: row wrap;
+	align-items: center;
+	flex-grow: 1;
+	flex-shrink: 1;
+	/* Set min-width to allow parent correctly to resize this element's children */
+	min-width: 0;
+}
+
+#savesListContainer .savesListRow .saveGroup > div {
+	display: flex;
+	justify-content: center;
+	margin: 0 10px;
+	flex-grow: 0;
+	flex-shrink: 0;
+}
+
+#savesListContainer .savesListRow .saveGroup .saveId {
+	min-width: 2em;
+	margin-left: 4px;
+	margin-right: -6px;
+}
+
+.jumpToSaveTransition {
+	background-color: var(--750);
+	transition-duration: 1s;
+}
+
+#savesListContainer .savesListRow .saveGroup .saveButton {
+	display: flex;
+	justify-content: center;
+	min-width: 110px;
+	margin: 0 10px;
+}
+
+#savesListContainer .savesListRow .saveGroup .saveName {
+	width: 60px;
+}
+
+#savesListContainer .savesListRow .saveGroup .saveButton input {
+	margin: 3px 0;
+}
+
+#savesListContainer .savesListRow .saveGroup > .saveDetails {
+	display: flex;
+	flex: 1 1 0;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: stretch;
+	min-width: 100px;
+}
+
+#savesListContainer .savesListRow .saveGroup > .saveDetails span {
+	max-height: 80px;
+	overflow-y: hidden;
+}
+
+#savesListContainer .savesListRow .saveGroup .deleteButton .exportButton .exportDebugButton {
+	display: flex;
+	justify-content: right;
+	margin: 0;
+}
+
+.datestamp {
+	font-size: 13px;
+}
+
+.listMargin {
+	display: inline-block;
+	margin: 1px 0;
+}
+
+.right {
+	float: right;
+}
+
+.sidebarButtonSplit {
+	display: flex;
+}
+
+.saveMenuButton {
+	background-color: var(--blue) !important;
+}
+
+.saveMenuButton:hover {
+	background-color: var(--blue) !important;
+}
+
+.saveMenuConfirm {
+	margin-top: 20px;
+	margin-left: 150px;
+}
+
+.saveBorder {
+	max-width: 700px;
+	margin: 10px 2px;
+	padding: 5px 2px 30px;
+	border: 1px solid var(--200);
+}
+
+.green {
+	color: var(--green);
+}
+
+.gold,
+.gold button,
+.goldLink a {
+	color: var(--gold);
+}
+
+.red {
+	color: var(--red);
+}
