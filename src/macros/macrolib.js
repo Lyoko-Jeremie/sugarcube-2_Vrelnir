@@ -1044,6 +1044,8 @@
 				}
 
 				while (evalJavaScript(condition)) {
+					if (Wikifier.stopWikify) return;
+					
 					if (--safety < 0) {
 						return this.error(`exceeded configured maximum loop iterations (${Config.macros.maxLoopIterations})`);
 					}
