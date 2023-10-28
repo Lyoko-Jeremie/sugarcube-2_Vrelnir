@@ -149,7 +149,11 @@ const Links = (() => {
 	return Object.freeze(Object.defineProperties({}, {
 		init: { value: init },
 		generate: { value: generate },
-		currentLinks: { value: currentLinks },
+		currentLinks: {
+			get() {
+				return currentLinks;
+			},
+		},
 		disableNumberifyInVisibleElements: { value: disableNumberifyInVisibleElements },
 		generateLinkNumbers: { value: generateLinkNumbers },
 		click: { value: click },
