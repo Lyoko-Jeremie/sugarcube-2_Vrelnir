@@ -88,12 +88,11 @@ const idb = (() => {
 			if (value == null) continue;
 			else if (typeof value === "function" || value.toJSON) {
 				// we've got a baddie, round him up!
+				if (verbose && V.idbTest) {
+					console.log("Warn: " + newPath + " of type " + typeof value + " shouldn't be in STORY variables!!!");
+				}
 				target[key] = JSON.stringify(value);
 				baddies.push(newPath);
-				if (verbose) {
-					if (window.Errors) Errors.report("Corrupt variable detected, please report!", newPath);
-					else console.log("Warn: " + newPath + " shouldn't be in STORY variables!!!");
-				}
 			} else if (typeof value === "object") funNuke(value, newPath, verbose);
 		}
 	}
