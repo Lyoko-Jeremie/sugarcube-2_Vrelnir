@@ -25,9 +25,9 @@ const Links = (() => {
 	function getPrettyKeyNumber(counter) {
 		let str = "";
 
-		switch (Math.floor(counter / 10)) {
-			case 3: str = "Ctrl + "; break;
-			case 2: str = "Alt + "; break;
+		switch (Math.floor((counter - 1) / 10)) { // 10 should be counted as 0
+			case 3: str = "Alt + "; break;
+			case 2: str = "Ctrl + "; break;
 			case 1: str = "Shift + "; break;
 		}
 		str += (counter % 10).toString();
@@ -59,7 +59,7 @@ const Links = (() => {
 		return generateLinkNumbers(document.getElementsByClassName("passage")[0] || document);
 	}
 
-	function click(index) {
+	function linkFollow(index) {
 		if ($(currentLinks).length >= index) $(currentLinks[index - 1].click());
 	}
 
@@ -70,51 +70,51 @@ const Links = (() => {
 			generateLinkNumbers(ev.content);
 		});
 
-		// prevent numpad / from bringing up browser's quick search
+		// prevent numpad keys from triggering browser's default shortcuts
 		$(document).on("keydown", ev => {
-			if (ev.code === "NumpadDivide") ev.preventDefault();
+			if (ev.code.startsWith("Numpad")) ev.preventDefault();
 		});
 
 		// assign shortcuts
 		$(document).on("keyup", ev => {
-			if (!enabled || V.tempDisable) return;
+			if (!enabled || V.tempDisable || V.options && !V.options.numberify_enabled) return;
 			if (document.activeElement.tagName === "INPUT" && document.activeElement.type !== "radio" && document.activeElement.type !== "checkbox") return;
 
 			let offset = 0;
 			if (ev.shiftKey) offset = 10;
-			else if (ev.altKey) offset = 20;
-			else if (ev.ctrlKey) offset = 30;
+			else if (ev.ctrlKey) offset = 20;
+			else if (ev.altKey) offset = 30;
 
 			switch (ev.code) {
 				case "Digit1": case "Numpad1": case "KeyN":
-					click(offset + 1);
+					linkFollow(offset + 1);
 					break;
 				case "Digit2": case "Numpad2":
-					click(offset + 2);
+					linkFollow(offset + 2);
 					break;
 				case "Digit3": case "Numpad3":
-					click(offset + 3);
+					linkFollow(offset + 3);
 					break;
 				case "Digit4": case "Numpad4":
-					click(offset + 4);
+					linkFollow(offset + 4);
 					break;
 				case "Digit5": case "Numpad5":
-					click(offset + 5);
+					linkFollow(offset + 5);
 					break;
 				case "Digit6": case "Numpad6":
-					click(offset + 6);
+					linkFollow(offset + 6);
 					break;
 				case "Digit7": case "Numpad7":
-					click(offset + 7);
+					linkFollow(offset + 7);
 					break;
 				case "Digit8": case "Numpad8":
-					click(offset + 8);
+					linkFollow(offset + 8);
 					break;
 				case "Digit9": case "Numpad9":
-					click(offset + 9);
+					linkFollow(offset + 9);
 					break;
 				case "Digit0": case "Numpad0":
-					click(offset + 10);
+					linkFollow(offset + 10);
 					break;
 				case "NumpadDivide":
 					// go back in history, twice if shift is pressed
@@ -156,7 +156,7 @@ const Links = (() => {
 		},
 		disableNumberifyInVisibleElements: { value: disableNumberifyInVisibleElements },
 		generateLinkNumbers: { value: generateLinkNumbers },
-		click: { value: click },
+		pushTheButton: { value: linkFollow },
 		numberPrepend: {
 			get() {
 				return  numberPrepend;
