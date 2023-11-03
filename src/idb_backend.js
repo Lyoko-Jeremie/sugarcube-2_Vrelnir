@@ -349,6 +349,13 @@ const idb = (() => {
 		return makePromise(details);
 	}
 
+	function getAllSaves() {
+		const transactionRequest = db.transaction(["saves"], "readonly");
+		const details = transactionRequest.objectStore("saves").getAll();
+
+		return makePromise(details);
+	}
+
 	/**
 	 * mercilessly clear all object stores one step short from outright deleting the db itself
 	 *
@@ -936,6 +943,7 @@ const idb = (() => {
 		deleteItem,
 		clearAll,
 		getSaveDetails,
+		getAllSaves,
 		saveState,
 		loadState,
 		importFromLocalStorage,
