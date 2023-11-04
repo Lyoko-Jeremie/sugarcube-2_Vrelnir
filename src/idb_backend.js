@@ -594,7 +594,7 @@ const idb = (() => {
 		Object.assign(cancelButton, {
 			type: "button",
 			className: "saveMenuButton saveMenuConfirm",
-			value: L10n.get("idbHtmlDeleteButton"),
+			value: L10n.get("idbHtmlCancelButton"),
 			onclick: () => saveList("show saves"),
 		});
 
