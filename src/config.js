@@ -34,6 +34,7 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 
 	// Navigation settings.
 	let _navigationOverride;
+	let _gotoButtons = true;
 
 	// Passages settings.
 	let _passagesDescriptions;
@@ -51,6 +52,7 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 	let _savesSlots           = 8;
 	let _savesTryDiskOnMobile = true;
 	let _savesVersion;
+	let _savesUseLZString     = -1; // try autodetect
 
 	// UI settings.
 	let _uiStowBarInitially    = 800;
@@ -186,7 +188,9 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 				}
 
 				_navigationOverride = value;
-			}
+			},
+			get gotoButtons() { return _gotoButtons; },
+			set gotoButtons(value) { return _gotoButtons = !!value; }
 		}),
 
 		/*
@@ -332,6 +336,9 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 
 			get version() { return _savesVersion; },
 			set version(value) { _savesVersion = value; },
+
+			get useLZString() { return _savesUseLZString; },
+			set useLZString(value) { return _savesUseLZString = value; },
 
 			// legacy
 			// Die if deprecated saves onLoad handler getter is accessed.

@@ -386,6 +386,15 @@ var UI = (() => { // eslint-disable-line no-unused-vars, no-var
 					.appendTo($tbody);
 			}
 
+			jQuery(document.createElement('label')).attr('id', 'idbToggleSaves').append(
+				jQuery(document.createElement('input'))
+					.attr({ id : 'checkbox-idbactive', name : 'checkbox-idbactive', type : 'checkbox', checked : idb.active && !V.ironmanmode, disabled : idb.lock || V.ironmanmode })
+					.addClass('macro-checkbox')
+					.on('change.macros', () => { idb.active = document.getElementById('checkbox-idbactive').checked; if (idb.active) { sessionStorage.removeItem('noidb'); setTimeout(()=>idb.saveList()); } })
+					.append("Enable indexedDB")
+			)
+				.appendTo($tbody);
+
 			return jQuery(document.createElement('table'))
 				.attr('id', 'saves-list')
 				.append($tbody);

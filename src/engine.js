@@ -226,6 +226,29 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 					debugView.append(debugBuffer);
 					_initDebugViews.push(debugView.output);
 				}
+				// story init executes on every game start, after all variables have been initialized
+				// and also on every page reload, before the saved session is loaded
+				// it's a great place to load a custom user settings script
+				new Promise((resolve, reject) => {
+					jQuery(document.createElement('script'))
+						.one('load abort error', ev => {
+							jQuery(ev.target).off();
+							if (ev.type === 'load') {
+								resolve(ev.target);
+							}
+							else {
+								reject(new Error('importScripts failed to load the script "usettings.js".'));
+							}
+						})
+						.appendTo(document.head)
+						.attr({
+							id   : 'script-imported-usettings.js',
+							type : 'text/javascript',
+							src  : 'usettings.js'
+						});
+				})
+					.then(() => console.log('usettings.js is active'))
+					.catch(() => console.log('usettings.js not active, this is normal'));
 			}
 			catch (ex) {
 				console.error(ex);

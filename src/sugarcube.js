@@ -9,6 +9,7 @@
 /*
 	global Alert, Browser, Config, Dialog, Engine, Fullscreen, Has, LoadScreen, SimpleStore, L10n, Macro, Passage,
 	       Save, Scripting, Setting, SimpleAudio, State, Story, UI, UIBar, DebugBar, Util, Visibility, Wikifier
+	, Links, idb
 */
 /* eslint-disable no-var */
 
@@ -164,6 +165,12 @@ jQuery(() => {
 
 				// Initialize the settings.
 				Setting.init();
+
+				// Initialize indexedDB
+				idb.init(Story.domId);
+
+				// Initialize hotkeys
+				Links.init();
 
 				// Initialize the macros.
 				Macro.init();

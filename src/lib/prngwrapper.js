@@ -37,6 +37,7 @@ var PRNGWrapper = (() => { // eslint-disable-line no-unused-vars, no-var
 				},
 				random: {
 					value() {
+						this.pull++;
 						return this._prng();
 					}
 				}

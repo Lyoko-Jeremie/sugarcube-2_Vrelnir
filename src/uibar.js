@@ -219,7 +219,14 @@ var UIBar = (() => { // eslint-disable-line no-unused-vars, no-var
 				role : 'button'
 			}, ev => {
 				ev.preventDefault();
-				UI.buildSaves();
+				// use idb when available
+				if (idb.active) {
+					Dialog.setup('saves', 'saveList');
+					setTimeout(() => idb.saveList());
+					//setTimeout(() => Dialog.resize());
+				}
+				// but keep the old system just in case
+				else UI.buildSaves();
 				Dialog.open();
 			})
 			.text(L10n.get('savesTitle'));
