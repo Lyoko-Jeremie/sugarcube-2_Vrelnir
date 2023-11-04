@@ -92,4 +92,39 @@
 	/* Macros. */
 	l10nStrings.macroBackText   = '返回';
 	l10nStrings.macroReturnText = '返回';
+
+	/* idb_backend.js */
+	l10nStrings.idbHtmlSaveLoadButton            = '保存/加载';
+	l10nStrings.idbHtmlSaveName                  = 'ID/Name';
+	l10nStrings.idbHtmlSaveDetails               = 'Details';
+	l10nStrings.idbHtmlClearButton               = 'Delete All';
+	l10nStrings.idbHtmlSaveButton                = 'Save';
+	l10nStrings.idbHtmlLoadButton                = 'Load';
+	l10nStrings.idbHtmlDeleteButton              = 'Delete';
+	l10nStrings.idbHtmlCancelButton              = 'Cancel';
+	l10nStrings.idbHtmlSaveTitle                 = 'Title: ';
+	l10nStrings.idbHtmlSaveSlotName              = 'Save Name: ';
+	l10nStrings.idbHtmlSaveId                    = 'Save Id: ';
+	l10nStrings.idbHtmlSaveDateTime              = 'Date: ';
+	l10nStrings.idbCannotSaveReplayScene         = 'The scene viewer is currently in use, preventing the use of the save system.';
+	l10nStrings.idbCannotSave                    = "You can't save here!";
+	l10nStrings.idbSaveWillLost                  = 'Saves here will be lost if your browser cache is cleared. Exporting is recommended to prevent the loss of saves from occurring.';
+	l10nStrings.idbLostSaves                     = 'Where are my saves?';
+	l10nStrings.idbLostSavesTooltip              = 'If you can\'t find your saves, it\'s possible you saved them using a different storage method. Try toggling the "Use old legacy storage" option below the saves list.';
+	l10nStrings.idbJumpToLatestButton            = ' Jump to most recent manual save ';
+	l10nStrings.idbHtmlPager                     = 'Page: ';
+	l10nStrings.idbHtmlPagerP                    = ' Saves per page: ';
+	l10nStrings.idbHtmlRequireConfirmationSave   = ' Require confirmation on Save ';
+	l10nStrings.idbHtmlRequireConfirmationLoad   = ' Require confirmation on Load ';
+	l10nStrings.idbHtmlRequireConfirmationDelete = ' Require confirmation on Delete ';
+	l10nStrings.idbHtmlUseLegacy                 = ' Use old legacy save storage ';
+	l10nStrings.idbHtmlConfirmSave               = 'Save on slot ';
+	l10nStrings.idbHtmlConfirmSaveOverwrite      = 'Overwrite save in slot ';
+	l10nStrings.idbHtmlConfirmSaveIdNotMatch     = 'Save ID does not match, continue with overwrite?';
+	l10nStrings.idbHtmlConfirmDelete             = 'Delete save in slot ';
+	l10nStrings.idbHtmlConfirmDeleteAuto         = 'auto';
+	l10nStrings.idbHtmlConfirmLoad               = 'Load slot ';
+	l10nStrings.idbHtmlConfirmLoadAuto           = 'auto';
+	l10nStrings.idbHtmlConfirmClearWARNING       = 'WARNING - Are you sure you would like to delete all saves?';
+	l10nStrings.idbHtmlConfirmClearAll           = 'Clear All Saves';
 })();
