@@ -20,7 +20,7 @@ const idb = (() => {
 	let lock = true; // don't allow multiple operations at the same time, majority of sugarcube is not async
 	let active = false; // whether to use indexedDB or the old localStorage
 	let dbName = "idb"; // database name
-	let footerHTML = ""; // add some text to fill empty space at the deleteAll button
+	const footerHTML = ""; // add some text to fill empty space at the deleteAll button
 	let migrationNeeded = false; // flag to migrate old saves
 
 	let db; // database to be
@@ -390,7 +390,7 @@ const idb = (() => {
 		const header = document.createElement("div");
 		header.className = "savesListRow";
 		header.innerHTML =
-			"<div class=saveGroup><div class=\"saveId\">#</div><div class=\"saveButton\">Save/Load</div><div class=\"saveName\">ID/Name</div><div class=\"saveDetails\">Details</div><div class=\"deleteButton\"></div></div>";
+			`<div class=saveGroup><div class="saveId">#</div><div class="saveButton">${L10n.get("idbHtmlSaveLoadButton")}</div><div class="saveName">${L10n.get("idbHtmlSaveName")}</div><div class="saveDetails">${L10n.get("idbHtmlSaveDetails")}</div><div class="deleteButton"></div></div>`;
 		listContainer.appendChild(header);
 
 		// request save details from indexedDB, then populate the list when request is fulfilled
@@ -466,7 +466,7 @@ const idb = (() => {
 			Object.assign(clearButton, {
 				type: "button",
 				className: "saveButton saveMenuButton right",
-				value: "Delete All",
+				value: L10n.get("idbHtmlClearButton"),
 				onclick: () => saveList("confirm clear"),
 			});
 			listContainer.lastChild.appendChild(clearButton);
@@ -506,7 +506,7 @@ const idb = (() => {
 		// save button
 		const saveButton = document.createElement("input");
 		saveButton.type = "button";
-		saveButton.value = "Save";
+		saveButton.value = L10n.get("idbHtmlSaveButton");
 		if (details.saveUnlock) {
 			saveButton.className = "saveMenuButton";
 			saveButton.onclick = () => saveList("confirm save", details);
@@ -517,7 +517,7 @@ const idb = (() => {
 		// load button
 		const loadButton = document.createElement("input");
 		loadButton.type = "button";
-		loadButton.value = "Load";
+		loadButton.value = L10n.get("idbHtmlLoadButton");
 		if (details.date) {
 			loadButton.className = "saveMenuButton";
 			loadButton.onclick = () => saveList("confirm load", details);
@@ -560,7 +560,7 @@ const idb = (() => {
 		Object.assign(deleteButton, {
 			className: "deleteButton right",
 			type: "button",
-			value: "Delete",
+			value: L10n.get("idbHtmlDeleteButton"),
 		});
 		if (details.date) {
 			deleteButton.classList.add("saveMenuButton");
@@ -594,7 +594,7 @@ const idb = (() => {
 		Object.assign(cancelButton, {
 			type: "button",
 			className: "saveMenuButton saveMenuConfirm",
-			value: "Cancel",
+			value: L10n.get("idbHtmlDeleteButton"),
 			onclick: () => saveList("show saves"),
 		});
 
@@ -602,11 +602,11 @@ const idb = (() => {
 		const oldSaveDescription = document.createDocumentFragment();
 		if (details && details.date) {
 			oldSaveDescription.appendChild(document.createElement("p"));
-			oldSaveDescription.lastChild.innerText = "Title: " + details.title;
+			oldSaveDescription.lastChild.innerText = L10n.get("idbHtmlSaveTitle") + details.title;
 			oldSaveDescription.appendChild(document.createElement("p"));
 			oldSaveDescription.lastChild.innerText =
-				(details.metadata.saveName ? "Save Name: " + details.metadata.saveName : "Save Id: " + details.metadata.saveId) +
-				", Date: " +
+				(details.metadata.saveName ? L10n.get("idbHtmlSaveSlotName") + details.metadata.saveName : L10n.get("idbHtmlSaveId") + details.metadata.saveId) +
+				`, ${L10n.get("idbHtmlSaveDateTime")}` +
 				new Date(details.date).toLocaleString();
 		}
 
@@ -617,20 +617,19 @@ const idb = (() => {
 				if (V.replayScene || Story.get(State.passage).tags.includes("nosave")) {
 					list.appendChild(document.createElement("h3"));
 					list.lastChild.className = "red";
-					if (V.replayScene) list.lastChild.innerText = "The scene viewer is currently in use, preventing the use of the save system.";
-					else list.lastChild.innerText = "You can't save here!";
+					if (V.replayScene) list.lastChild.innerText = L10n.get("idbCannotSaveReplayScene");
+					else list.lastChild.innerText = L10n.get("idbCannotSave");
 				}
 				list.appendChild(document.createElement("p"));
-				list.lastChild.innerText =
-					"Saves here will be lost if your browser cache is cleared. Exporting is recommended to prevent the loss of saves from occurring.";
+				list.lastChild.innerText = L10n.get("idbSaveWillLost");
 
 				const lostSaves = document.createElement("p");
-				lostSaves.innerHTML = "<i class=\"description\"><u>Where are my saves?</u></i> ";
+				lostSaves.innerHTML = `<i class="description"><u>${L10n.get("idbLostSaves")}</u></i> `;
 				const lostSavesTooltip = document.createElement("mouse");
 				lostSavesTooltip.classList.add("tooltip", "linkBlue");
 				lostSavesTooltip.innerText = "(?)";
 				lostSavesTooltip.appendChild(document.createElement("span"));
-				lostSavesTooltip.lastChild.innerText = `If you can't find your saves, it's possible you saved them using a different storage method. Try toggling the "Use old legacy storage" option below the saves list.`;
+				lostSavesTooltip.lastChild.innerText = L10n.get("idbLostSavesTooltip");
 				lostSaves.appendChild(lostSavesTooltip);
 				list.appendChild(lostSaves);
 
@@ -697,7 +696,7 @@ const idb = (() => {
 				const jumpToLatest = document.createElement("input");
 				Object.assign(jumpToLatest, {
 					type: "button",
-					value: " Jump to most recent manual save ",
+					value: L10n.get("idbJumpToLatestButton"),
 					onclick: () => {
 						// potentially exploitable to allow saving to slots way above the limit, but the limit is arbitrary to begin with, and idb doesn't actually suffer one bit from going beyond that limit
 						listPage = Math.floor((latestSave.slot - 1) / listLength + 1);
@@ -713,11 +712,11 @@ const idb = (() => {
 				});
 
 				const pager = document.createElement("div");
-				pager.append("Page: ");
+				pager.append(L10n.get("idbHtmlPager"));
 				pager.appendChild(prevPage);
 				pager.appendChild(pageNum);
 				pager.appendChild(nextPage);
-				pager.append(" Saves per page: ");
+				pager.append(L10n.get("idbHtmlPagerP"));
 				pager.appendChild(pageLen);
 				pager.appendChild(jumpToLatest);
 
@@ -732,7 +731,7 @@ const idb = (() => {
 				});
 				list.appendChild(document.createElement("label"));
 				list.lastChild.append(reqSave);
-				list.lastChild.append(" Require confirmation on Save ");
+				list.lastChild.append(L10n.get("idbHtmlRequireConfirmationSave"));
 				list.append(document.createElement("br"));
 
 				const reqLoad = document.createElement("input");
@@ -743,7 +742,7 @@ const idb = (() => {
 				});
 				list.appendChild(document.createElement("label"));
 				list.lastChild.append(reqLoad);
-				list.lastChild.append(" Require confirmation on Load ");
+				list.lastChild.append(L10n.get("idbHtmlRequireConfirmationLoad"));
 				list.append(document.createElement("br"));
 
 				const reqDelete = document.createElement("input");
@@ -754,7 +753,7 @@ const idb = (() => {
 				});
 				list.appendChild(document.createElement("label"));
 				list.lastChild.append(reqDelete);
-				list.lastChild.append(" Require confirmation on Delete ");
+				list.lastChild.append(L10n.get("idbHtmlRequireConfirmationDelete"));
 				list.append(document.createElement("br"));
 
 				// add instant idb switcher
@@ -772,7 +771,7 @@ const idb = (() => {
 				});
 				list.appendChild(document.createElement("label"));
 				list.lastChild.append(idbToggle);
-				list.lastChild.append(" Use old legacy save storage ");
+				list.lastChild.append(L10n.get("idbHtmlUseLegacy"));
 
 				setTimeout(() => {
 					savesDiv.innerHTML = "";
@@ -793,22 +792,22 @@ const idb = (() => {
 				confirmSave.appendChild(document.createElement("h3"));
 				confirmSave.lastChild.className = "red";
 				if (details.date === "") {
-					confirmSave.lastChild.innerText = "Save on slot " + details.slot;
+					confirmSave.lastChild.innerText = L10n.get("idbHtmlConfirmSave") + details.slot;
 				} else {
-					confirmSave.lastChild.innerText = "Overwrite save in slot " + details.slot;
+					confirmSave.lastChild.innerText = L10n.get("idbHtmlConfirmSaveOverwrite") + details.slot;
 					confirmSave.appendChild(oldSaveDescription);
 				}
 				if (details.date && V.saveId !== details.metadata.saveId) {
 					confirmSave.appendChild(document.createElement("span"));
 					confirmSave.lastChild.className = "red";
-					confirmSave.lastChild.innerText = "Save ID does not match, continue with overwrite?";
+					confirmSave.lastChild.innerText = L10n.get("idbHtmlConfirmSaveIdNotMatch");
 				}
 
 				const saveButton = document.createElement("input");
 				Object.assign(saveButton, {
 					type: "button",
 					className: "saveMenuButton saveMenuConfirm",
-					value: "Save",
+					value: L10n.get("idbHtmlSaveButton"),
 					onclick: () => saveState(details.slot).then(() => window.closeOverlay()),
 				});
 				confirmSave.appendChild(document.createElement("div"));
@@ -829,14 +828,14 @@ const idb = (() => {
 				confirmDelete.className = "saveBorder";
 				confirmDelete.appendChild(document.createElement("h3"));
 				confirmDelete.lastChild.className = "red";
-				confirmDelete.lastChild.innerText = "Delete save in slot " + (details.slot === 0 ? "auto" : details.slot);
+				confirmDelete.lastChild.innerText = L10n.get("idbHtmlConfirmDelete") + (details.slot === 0 ? L10n.get("idbHtmlConfirmDeleteAuto") : details.slot);
 				confirmDelete.appendChild(oldSaveDescription);
 
 				const deleteButton = document.createElement("input");
 				Object.assign(deleteButton, {
 					type: "button",
 					className: "saveMenuButton saveMenuConfirm",
-					value: "Delete",
+					value: L10n.get("idbHtmlDeleteButton"),
 					onclick: () => deleteItem(details.slot).then(() => saveList()),
 				});
 				confirmDelete.appendChild(document.createElement("div"));
@@ -857,7 +856,7 @@ const idb = (() => {
 				confirmLoad.className = "saveBorder";
 				confirmLoad.appendChild(document.createElement("h3"));
 				confirmLoad.lastChild.className = "red";
-				confirmLoad.lastChild.innerText = "Load slot " + (details.slot === 0 ? "auto" : details.slot);
+				confirmLoad.lastChild.innerText = L10n.get("idbHtmlConfirmLoad") + (details.slot === 0 ? L10n.get("idbHtmlConfirmLoadAuto") : details.slot);
 				confirmLoad.appendChild(oldSaveDescription);
 
 				const loadButton = document.createElement("input");
@@ -884,13 +883,13 @@ const idb = (() => {
 				confirmClear.className = "saveBorder";
 				confirmClear.appendChild(document.createElement("h2"));
 				confirmClear.lastChild.className = "red";
-				confirmClear.lastChild.innerText = "WARNING - Are you sure you would like to delete all saves?";
+				confirmClear.lastChild.innerText = L10n.get("idbHtmlConfirmClearWARNING");
 
 				const clearButton = document.createElement("input");
 				Object.assign(clearButton, {
 					type: "button",
 					className: "saveMenuButton saveMenuConfirm",
-					value: "Clear All Saves",
+					value: L10n.get("idbHtmlConfirmClearAll"),
 					onclick: () => clearAll().then(() => saveList()),
 				});
 				confirmClear.appendChild(document.createElement("div"));
