@@ -138,56 +138,61 @@ const idb = (() => {
 	/**
 	 * copy saves from localStorage into indexedDB, without regard to what's already in there
 	 *
-	 * @returns {boolean} success of the operation
+	 * @returns {Promise<boolean>} success of the operation
 	 */
-	async function importFromLocalStorage() {
+	function importFromLocalStorage() {
 		const oldSaves = Save.get();
-		const autoSave = oldSaves.autosave;
-		if (autoSave != null) {
-			// autosave was moved from a separate slot in old system to just 0 in new
-			const save = autoSave.state;
-			// there is no need for delta-compression in indexedDB, restore real history
-			if (save.jdelta) save.history = State.jdeltaDecode(save.delta, save.jdelta);
-			else if (save.delta) save.history = State.deltaDecode(save.delta);
-			delete save.jdelta;
-			delete save.delta;
-			// no need for json-compression either
-			if (window.DoLSave) DoLSave.decompressIfNeeded({ state: save });
-			// remove known function-type vars from old save data because indexedDB can not store them
-			save.history.forEach(s => delete s.variables.currentFurnishing);
+		return Promise.resolve()
+			.then(() => {
+				const autoSave = oldSaves.autosave;
+				if (autoSave != null) {
+					// autosave was moved from a separate slot in old system to just 0 in new
+					const save = autoSave.state;
+					// there is no need for delta-compression in indexedDB, restore real history
+					if (save.jdelta) save.history = State.jdeltaDecode(save.delta, save.jdelta);
+					else if (save.delta) save.history = State.deltaDecode(save.delta);
+					delete save.jdelta;
+					delete save.delta;
+					// no need for json-compression either
+					if (window.DoLSave) DoLSave.decompressIfNeeded({ state: save });
+					// remove known function-type vars from old save data because indexedDB can not store them
+					save.history.forEach(s => delete s.variables.currentFurnishing);
 
-			const data = {
-				date: autoSave.date,
-				id: autoSave.id,
-				title: autoSave.title,
-				metadata: autoSave.metadata || { saveId: save.history.last().variables.saveId, saveName: save.history.last().variables.saveName },
-			};
-			// setItem only allows one operation at a time to prevent possible exploits, so wait for it to finish
-			await setItem(0, save, { slot: 0, data });
-		}
-		for (let i = 0; i < 8; i++) {
-			const slotSave = oldSaves.slots[i];
-			if (slotSave != null) {
-				const save = slotSave.state;
-				// same as for autosave
-				if (save.jdelta) save.history = State.jdeltaDecode(save.delta, save.jdelta);
-				else if (save.delta) save.history = State.deltaDecode(save.delta);
-				delete save.jdelta;
-				delete save.delta;
-				if (window.DoLSave) DoLSave.decompressIfNeeded({ state: save });
-				// remove known functions from old save data because indexedDB can not store them
-				save.history.forEach(s => delete s.variables.currentFurnishing);
-				const data = {
-					date: slotSave.date,
-					id: slotSave.id,
-					title: slotSave.title,
-					metadata: slotSave.metadata || { saveId: save.history.last().variables.saveId, saveName: save.history.last().variables.saveName },
-				};
-				await setItem(i + 1, save, { slot: i + 1, data });
-			}
-		}
-		console.log("idb migration successful");
-		return true;
+					const data = {
+						date: autoSave.date,
+						id: autoSave.id,
+						title: autoSave.title,
+						metadata: autoSave.metadata || { saveId: save.history.last().variables.saveId, saveName: save.history.last().variables.saveName },
+					};
+					// setItem only allows one operation at a time to prevent possible exploits, so wait for it to finish
+					return setItem(0, save, { slot: 0, data });
+				}
+			})
+			.then(() => [...Array(7).keys()].reduce((promise, i) => promise.then(() => {
+				const slotSave = oldSaves.slots[i];
+				if (slotSave != null) {
+					const save = slotSave.state;
+					// same as for autosave
+					if (save.jdelta) save.history = State.jdeltaDecode(save.delta, save.jdelta);
+					else if (save.delta) save.history = State.deltaDecode(save.delta);
+					delete save.jdelta;
+					delete save.delta;
+					if (window.DoLSave) DoLSave.decompressIfNeeded({ state: save });
+					// remove known functions from old save data because indexedDB can not store them
+					save.history.forEach(s => delete s.variables.currentFurnishing);
+					const data = {
+						date: slotSave.date,
+						id: slotSave.id,
+						title: slotSave.title,
+						metadata: slotSave.metadata || { saveId: save.history.last().variables.saveId, saveName: save.history.last().variables.saveName },
+					};
+					return setItem(i + 1, save, { slot: i + 1, data });
+				}
+			}), Promise.resolve()))
+			.then(() => {
+				console.log("idb migration successful");
+				return true;
+			});
 	}
 
 	/**
