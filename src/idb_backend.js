@@ -70,7 +70,7 @@ const idb = (() => {
 	 * use math.random to not trip prng
 	 */
 	function genSaveId() {
-		if (!V.saveId) V.saveId = Math.floor(Math.random() * 90000) + 10000;
+		return Math.floor(Math.random() * 90000) + 10000;
 	}
 
 	/**
@@ -153,8 +153,11 @@ const idb = (() => {
 			delete save.delta;
 			// no need for json-compression either
 			if (window.DoLSave) DoLSave.decompressIfNeeded({ state: save });
-			// remove known function-type vars from old save data because indexedDB can not store them
-			save.history.forEach(s => delete s.variables.currentFurnishing);
+			// assign V.saveId if necessary
+			const saveIdNew = genSaveId();
+			save.history.forEach(s => {
+				if (!s.variables.saveId) s.variables.saveId = saveIdNew;
+			});
 
 			const data = {
 				date: autoSave.date,
@@ -316,9 +319,6 @@ const idb = (() => {
 			Save.onLoad.handlers.forEach(fn => fn({ state: value.data }));
 			State.unmarshalForSave(value.data);
 			State.show();
-			// set V.saveId for saves without one
-			// should probably be done after State.show in case a game implements it's own ID assignment in passageHeader
-			genSaveId();
 		});
 	}
 
@@ -330,8 +330,13 @@ const idb = (() => {
 	function saveState(slot) {
 		if (lock) return;
 		const saveObj = State.marshalForSave();
+		// assign V.saveId if necessary
+		const saveIdNew = genSaveId();
+		if (!V.saveId) V.saveId = saveIdNew;
+		saveObj.forEach(s => {
+			if (!s.variables.saveId) s.variables.saveId = saveIdNew;
+		});
 		Save.onSave.handlers.forEach(fn => fn({ state: saveObj, date: Date.now() }, { type: slot <= 0 ? "autosave" : "slot" })); // run onSave handlers
-		// window.onSave({ state: saveObj }); // run onSave handlers
 		if (saveObj != null) return setItem(slot, saveObj);
 		return false;
 	}
