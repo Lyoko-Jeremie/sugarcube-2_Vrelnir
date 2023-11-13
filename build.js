@@ -163,18 +163,19 @@ const _opt  = require('node-getopt').create([
 	['b', 'build=VERSION', 'Build only for Twine major version: 1 or 2; default: build for all.'],
 	['d', 'debug',         'Keep debugging code; gated by DEBUG symbol.'],
 	['u', 'unminified',    'Suppress minification stages.'],
-	['n', 'no-transpile',  'Suppress JavaScript transpilation stages.'],
+	['t', 'transpile',  'Enable JavaScript transpilation stages.'],
 	['h', 'help',          'Print this help, then exit.']
 ])
 	.bindHelp()
 	.parseSystem();
 
-let _buildForTwine1 = true;
+let _buildForTwine1 = false;
 let _buildForTwine2 = true;
 
 if (_opt.options.build) {
 	switch (_opt.options.build) {
 	case '1':
+		_buildForTwine1 = true;
 		_buildForTwine2 = false;
 		break;
 
@@ -296,7 +297,7 @@ function compileJavaScript(filenameObj, options) {
 	let bundle = concatFiles(filenameObj.files);
 
 	// Transpile to ES5 with Babel.
-	if (!_opt.options.noTranspile) {
+	if (_opt.options.transpile) {
 		const { transform } = require('@babel/core');
 		bundle = transform(bundle, {
 			// babelHelpers : 'bundled',
