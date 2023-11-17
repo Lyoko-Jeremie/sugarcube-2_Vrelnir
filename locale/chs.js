@@ -15,7 +15,8 @@
 /* eslint-disable strict */
 
 (function () {
-	if (navigator.language !== 'zh-CN') {
+	// zh-CN, zh, zh-TW, zh-HK, zh-SG
+	if (!navigator.language.startsWith('zh')) {
 		return;
 	}
 
