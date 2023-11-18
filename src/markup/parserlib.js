@@ -125,7 +125,7 @@
 		the need to use template literals or other workarounds to pass complex data structures.
 
 		Also allows us to define arrow function inside object literals.
-		
+
 		Example usage:
 		Before: <<macroName `{"key": "value"}`>>
 		After:  <<macroName {key:"value"}>>
@@ -1601,6 +1601,7 @@
 		namespace : 'http://www.w3.org/2000/svg',
 
 		handler(w) {
+			// this handler never be called , don't know why , same as DoL author
 			this.lookahead.lastIndex = w.nextMatch;
 
 			let depth = 1;
@@ -1709,6 +1710,19 @@
 							// so set its `href` content attribute instead.
 							el.setAttribute('href', passage.text.trim());
 						}
+					}
+					// console.log('############ Wikifier.Parser svgTag output', el.cloneNode(true), el.tagName);
+
+					const hrefLink = el.getAttribute('href') || el.getAttribute('xlink:href') || undefined;
+					if (typeof window.modSC2DataManager !== 'undefined' &&
+						typeof window.modSC2DataManager.getHtmlTagSrcHook?.()?.doHook !== 'undefined' &&
+						!!hrefLink) {
+						// need check the src is not "data:" URI
+						el.setAttribute('ML-href', hrefLink);
+						el.removeAttribute('href');
+						el.removeAttribute('xlink:href');
+						// call img loader on there
+						window.modSC2DataManager.getHtmlTagSrcHook().doHook(el, 'href').catch(Err => console.error(Err));
 					}
 				}
 
@@ -1881,7 +1895,7 @@
 							el.setAttribute('ML-src', el.getAttribute('src'));
 							el.removeAttribute('src');
 							// call img loader on there
-							window.modSC2DataManager.getHtmlTagSrcHook().doHook(el).catch(E => console.error(E));
+							window.modSC2DataManager.getHtmlTagSrcHook().doHook(el, 'src').catch(Err => console.error(Err));
 						}
 					}
 					// if (tagName.startsWith('img')) {
