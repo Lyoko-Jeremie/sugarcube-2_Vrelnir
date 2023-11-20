@@ -1,3 +1,5 @@
+/* "this just works" */
+
 :root {
 	/* Primary Colours
 	These are the primary greyscale colours used in the default theme
@@ -37,19 +39,6 @@
 	--yellow: #ffd700;
 	--gold: gold;
 	--silver: silver;
-
-	/* Status Specific */
-	--lewd: #e04880;
-	--defiant: #d20000;
-	--meek: #c44b8b;
-	--brat: #b75d41;
-	--relaxed: #63719c;
-	--anxious: #973253;
-	--veteran: #956bb4;
-	--methodical: #ce7993;
-	--scarred: #d8621f;
-	--tattooed: #266568;
-	--manager: #7094b5;
 
 	/* Utility */
 	--link: #5888dd;
@@ -134,17 +123,59 @@
 
 #savesListContainer .savesListRow .saveGroup > .saveDetails span {
 	max-height: 80px;
-	overflow-y: hidden;
+	white-space: nowrap;
+	overflow-x: clip;
 }
 
-#savesListContainer .savesListRow .saveGroup .deleteButton .exportButton .exportDebugButton {
+/*
+ * footer for the save list
+ */
+#savesListFooter {
+	justify-content: space-between;
+	padding: 0 !important;
+	line-height: normal;
+}
+
+#savesListFooter div {
 	display: flex;
-	justify-content: right;
-	margin: 0;
+	justify-content: stretch;
+}
+
+/* export button */
+#savesListFooter #exportButton {
+	background-color: var(--blue);
+	border: 1px solid var(--500);
+}
+
+#savesListFooter #exportButton:before {
+	font-family: "tme-fa-icons";
+	content: "\e829\00a0";
+}
+
+/* import button */
+#savesListFooter #importButton {
+	border: 1px solid var(--500);
+	padding: .4em;
+	cursor: pointer;
+}
+
+#savesListFooter #importButton:before {
+	font-family: "tme-fa-icons";
+	content: "\e82a\00a0";
+}
+
+/* clear button */
+#savesListFooter #clearButton {
+	border: 1px solid var(--500);
+}
+
+#savesListFooter #clearButton:before {
+	font-family: "tme-fa-icons";
+	content: "\e827\00a0";
 }
 
 .datestamp {
-	font-size: 13px;
+	font-size: 0.8em;
 }
 
 .listMargin {
@@ -154,10 +185,6 @@
 
 .right {
 	float: right;
-}
-
-.sidebarButtonSplit {
-	display: flex;
 }
 
 .saveMenuButton {
