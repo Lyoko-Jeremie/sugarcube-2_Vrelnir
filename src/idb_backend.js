@@ -20,7 +20,6 @@ const idb = (() => {
 	let lock = true; // don't allow multiple operations at the same time, majority of sugarcube is not async
 	let active = false; // whether to use indexedDB or the old localStorage
 	let dbName = "idb"; // database name
-	let footerHTML = ""; // add some text to fill empty space at the deleteAll button
 	let migrationNeeded = false; // flag to migrate old saves
 
 	let db; // database to be
@@ -333,7 +332,7 @@ const idb = (() => {
 		// assign V.saveId if necessary
 		const saveIdNew = genSaveId();
 		if (!V.saveId) V.saveId = saveIdNew;
-		saveObj.forEach(s => {
+		saveObj.history.forEach(s => {
 			if (!s.variables.saveId) s.variables.saveId = saveIdNew;
 		});
 		Save.onSave.handlers.forEach(fn => fn({ state: saveObj, date: Date.now() }, { type: slot <= 0 ? "autosave" : "slot" })); // run onSave handlers
@@ -375,11 +374,24 @@ const idb = (() => {
 		return makePromise(transactionRequest);
 	}
 
+	/**
+	 * check if saves are allowed
+	 */
+	function savesAllowed() {
+		return typeof Config.saves.isAllowed !== "function" || Config.saves.isAllowed();
+	}
+
+	/**
+	 * define saveList variables
+	 */
+
 	let listLength; // store save list length in idb
 	let listPage; // same with the current page
 	const listLengthMax = 20; // maximum number of rows
 	const listPageMax = 20; // maximum number of pages
 	let latestSave = { slot: 1, date: 0 }; // keep track of the most recent save, separately from autosave on slot 0
+	let extraSaveWarn;
+	let footerHTML = ""; // add some text to fill empty space at the deleteAll button
 
 	/**
 	 * construct a saves list page, with configurable length
@@ -389,20 +401,19 @@ const idb = (() => {
 	 * @returns {DocumentFragment};
 	 */
 	function showSavesList(page = listPage - 1, length = listLength) {
+		const frag = document.createDocumentFragment();
 		const listContainer = document.createElement("div");
 		listContainer.id = "savesListContainer";
-		// create a header row for the table
-		const header = document.createElement("div");
-		header.className = "savesListRow";
-		header.innerHTML =
-			"<div class=saveGroup><div class=\"saveId\">#</div><div class=\"saveButton\">Save/Load</div><div class=\"saveName\">ID/Name</div><div class=\"saveDetails\">Details</div><div class=\"deleteButton\"></div></div>";
-		listContainer.appendChild(header);
+		frag.appendChild(listContainer);
+
 
 		// request save details from indexedDB, then populate the list when request is fulfilled
 		idb.getSaveDetails().then(details => {
 			if (!Array.isArray(details)) return;
 
-			const saveUnlock = !Story.get(State.passage).tags.includes("nosave") && V.replayScene === undefined;
+			listContainer.appendChild(generateHeaderRow());
+			// cache whether saves are allowed
+			const saveUnlock = savesAllowed();
 
 			// find the most recent save that is not autosave
 			latestSave = { slot: 1, date: 0 }; // re-init latest slot every time
@@ -434,6 +445,13 @@ const idb = (() => {
 				} else page = 0;
 				listPage = page + 1;
 			}
+
+			// getSaveDetails can take longer to init listLength and listPage than it takes for their fields to be placed on page, gotta update them in such case
+			const pageField = document.getElementById("pageNum");
+			if (pageField != null) pageField.value = listPage;
+			const lengthField = document.getElementById("pageLen");
+			if (lengthField != null) lengthField.value = listLength;
+
 			// default object details for an empty slot
 			const defaultDetailsObj = { date: "", title: "", metadata: { saveId: "", saveName: "" } };
 
@@ -459,24 +477,119 @@ const idb = (() => {
 				detailsObj.saveUnlock = saveUnlock;
 				listContainer.appendChild(generateSaveRow(detailsObj));
 			}
-
-			// append a footer row
-			const footer = document.createElement("div");
-			footer.className = "savesListRow";
-			// TODO: this should not be dol-specific by default
-			footer.innerHTML = "<div class=saveGroup><span style='margin: 0'>Special thanks to all those who <a class='link-external' target='_blank' href='https://subscribestar.adult/vrelnir'>Support Degrees of Lewdity</span><div class='saveId'></div><div class='saveButton'></div><div class='saveName'></div><div class='saveDetails'></div></div>";
-			if (footerHTML) footer.firstChild.firstChild.innerHTML = footerHTML;
-			listContainer.appendChild(footer);
-			const clearButton = document.createElement("input");
-			Object.assign(clearButton, {
-				type: "button",
-				className: "saveButton saveMenuButton right",
-				value: "Delete All",
-				onclick: () => saveList("confirm clear"),
-			});
-			listContainer.lastChild.appendChild(clearButton);
+			listContainer.appendChild(generateFooterRow());
 		});
-		return listContainer;
+		return frag;
+	}
+
+	/**
+	 * construct the header row for the save list
+	 * warning: unnecessarily complicated DOM manipulations
+	 *
+	 * @returns {DocumentFragment} header row
+	 */
+	function generateHeaderRow() {
+		const frag = document.createDocumentFragment();
+		const saveListHeader = document.createElement("div");
+		saveListHeader.className = "savesListRow";
+		frag.appendChild(saveListHeader);
+
+		const headerSaveGroup = document.createElement("div");
+		headerSaveGroup.className = "saveGroup";
+		saveListHeader.appendChild(headerSaveGroup);
+
+		const headerSaveId = document.createElement("div");
+		headerSaveId.className = "saveId";
+		headerSaveId.innerText = "#";
+		headerSaveGroup.appendChild(headerSaveId);
+
+		const headerSaveButton = document.createElement("div");
+		headerSaveButton.className = "saveButton";
+		headerSaveButton.innerText = L10n.get("savesHeaderSaveLoad");
+		headerSaveGroup.appendChild(headerSaveButton);
+
+		const headerSaveName = document.createElement("div");
+		headerSaveName.className = "saveName";
+		headerSaveName.innerText = L10n.get("savesHeaderIDName");
+		headerSaveGroup.appendChild(headerSaveName);
+
+		const headerSaveDetails = document.createElement("div");
+		headerSaveDetails.className = "saveDetails";
+		headerSaveDetails.innerText = L10n.get("savesHeaderDetails");
+		headerSaveGroup.appendChild(headerSaveDetails);
+
+		const headerDeleteButton = document.createElement("div");
+		headerDeleteButton.className = "deleteButton";
+		headerSaveGroup.appendChild(headerDeleteButton);
+
+		return frag;
+	}
+
+	/**
+	 * construct the footer row for the save list
+	 * warning: unnecessarily complicated DOM manipulations
+	 *
+	 * @returns {DocumentFragment} footer row
+	 */
+	function generateFooterRow() {
+		const frag = document.createDocumentFragment();
+		const savesListFooter = document.createElement("div");
+		savesListFooter.id = "savesListFooter";
+		savesListFooter.className = "savesListRow";
+		frag.appendChild(savesListFooter);
+
+		if (footerHTML) {
+			// override footer row with provided html string
+			savesListFooter.innerHTML = footerHTML;
+			return frag;
+		}
+
+		// import/export div
+		const footerImportExport = document.createElement("div");
+		savesListFooter.appendChild(footerImportExport);
+
+		// export button
+		const exportButton = document.createElement("button");
+		Object.assign(exportButton, {
+			id: "exportButton",
+			className: "saveButton",
+			innerText: L10n.get("savesLabelExport"),
+			onclick: () => {
+				if (savesAllowed()) Save.export();
+			},
+		});
+		footerImportExport.appendChild(exportButton);
+
+		// import button, but actually a label for the input form
+		const importButton = document.createElement("label");
+		Object.assign(importButton, {
+			id: "importButton",
+			htmlFor: "saves-import",
+			innerText: L10n.get("savesLabelImport"),
+			className: "saveButton saveMenuButton",
+		});
+		footerImportExport.appendChild(importButton);
+		// import file input form
+		const importButtonInput = document.createElement("input");
+		Object.assign(importButtonInput, {
+			type: "file",
+			id: "saves-import",
+			style: "display: none",
+			onchange: ev => Save.import(ev),
+		});
+		importButton.appendChild(importButtonInput);
+
+		// clear all button
+		const clearAllButton = document.createElement("button");
+		Object.assign(clearAllButton, {
+			id: "clearButton",
+			className: "saveButton saveMenuButton right",
+			innerText: L10n.get("savesLabelClear"),
+			onclick: () => saveList("confirm clear"),
+		});
+		savesListFooter.appendChild(clearAllButton);
+
+		return frag;
 	}
 
 	/**
@@ -502,7 +615,6 @@ const idb = (() => {
 		saveId.className = "saveId";
 		saveId.innerText = details.slot === 0 ? "A" : details.slot;
 		if (details.slot > listPageMax * listLengthMax || details.slot < 0) saveId.classList.add("red");
-		group.appendChild(saveId);
 
 		// save/load buttons container
 		const saveload = document.createElement("div");
@@ -511,7 +623,7 @@ const idb = (() => {
 		// save button
 		const saveButton = document.createElement("input");
 		saveButton.type = "button";
-		saveButton.value = "Save";
+		saveButton.value = L10n.get("savesLabelSave");
 		if (details.saveUnlock) {
 			saveButton.className = "saveMenuButton";
 			saveButton.onclick = () => saveList("confirm save", details);
@@ -522,7 +634,7 @@ const idb = (() => {
 		// load button
 		const loadButton = document.createElement("input");
 		loadButton.type = "button";
-		loadButton.value = "Load";
+		loadButton.value = L10n.get("savesLabelLoad");
 		if (details.date) {
 			loadButton.className = "saveMenuButton";
 			loadButton.onclick = () => saveList("confirm load", details);
@@ -531,7 +643,6 @@ const idb = (() => {
 		}
 		if (details.slot !== 0) saveload.appendChild(saveButton);
 		saveload.appendChild(loadButton);
-		group.appendChild(saveload);
 
 		// save name
 		const saveName = document.createElement("div");
@@ -539,7 +650,6 @@ const idb = (() => {
 		// highlight saves with currently loaded save's id
 		if (V.saveId === details.metadata.saveId) saveName.classList.add("gold");
 		saveName.innerText = details.metadata.saveName ? details.metadata.saveName.slice(0, 10) : details.metadata.saveId;
-		group.appendChild(saveName);
 
 		// save details
 		const saveDetails = document.createElement("div");
@@ -558,14 +668,13 @@ const idb = (() => {
 		}
 		saveDetails.appendChild(description);
 		saveDetails.appendChild(date);
-		group.appendChild(saveDetails);
 
 		// delete button
 		const deleteButton = document.createElement("input");
 		Object.assign(deleteButton, {
 			className: "deleteButton right",
 			type: "button",
-			value: "Delete",
+			value: L10n.get("savesLabelDelete"),
 		});
 		if (details.date) {
 			deleteButton.classList.add("saveMenuButton");
@@ -574,11 +683,93 @@ const idb = (() => {
 			deleteButton.disabled = true;
 		}
 
+		group.append(saveId, saveload, saveName, saveDetails);
 		row.appendChild(group);
 		row.appendChild(deleteButton);
 
 		return row;
 	}
+
+	function generatePager() {
+		// previous page button
+		const prevPage = document.createElement("input");
+		Object.assign(prevPage, {
+			type: "button",
+			value: " < ",
+			disabled: listPage === 1,
+			onclick: () => {
+				if (listPage > 1) listPage--;
+				saveList();
+			},
+		});
+
+		// page number input
+		const pageNum = document.createElement("input");
+		Object.assign(pageNum, {
+			id: "pageNum",
+			type: "number",
+			value: listPage,
+			style: "width: 3em",
+			min: 1,
+			max: listPageMax,
+			onchange: () => {
+				listPage = Math.clamp(Math.round(pageNum.value), 1, listPageMax);
+				saveList();
+			},
+		});
+
+		// next page button
+		const nextPage = document.createElement("input");
+		Object.assign(nextPage, {
+			type: "button",
+			value: " > ",
+			disabled: listPage >= listPageMax,
+			onclick: () => {
+				if (listPage < listPageMax) listPage++;
+				saveList();
+			},
+		});
+
+		// list length input
+		const pageLen = document.createElement("input");
+		Object.assign(pageLen, {
+			id: "pageLen",
+			type: "number",
+			value: listLength,
+			style: "width: 3em",
+			min: 1,
+			max: listLengthMax,
+			onchange: () => {
+				listLength = Math.clamp(pageLen.value, 1, listLengthMax);
+				saveList();
+			},
+		});
+
+		// jump to most recent save button
+		const jumpToLatest = document.createElement("input");
+		Object.assign(jumpToLatest, {
+			type: "button",
+			value: L10n.get("savesPagerJump"),
+			onclick: () => {
+				// potentially exploitable to allow saving to slots way above the limit, but the limit is arbitrary to begin with, and idb doesn't actually suffer one bit from going beyond that limit
+				listPage = Math.floor((latestSave.slot - 1) / listLength + 1);
+				saveList();
+				setTimeout(() => {
+					const el = document.getElementById("latestSaveRow");
+					if (el != null) {
+						el.classList.remove("jumpToSaveTransition");
+						el.classList.add("jumpToSaveTransition");
+					}
+				}, Engine.minDomActionDelay);
+			},
+		});
+
+		const pager = document.createElement("div");
+		pager.append(L10n.get("savesPagerPage"), prevPage, pageNum, nextPage, L10n.get("savesPagerSavesPerPage"), pageLen, jumpToLatest);
+
+		return pager;
+	}
+
 
 	// alias for closing the saves menu
 	if (typeof window.closeOverlay === "undefined") window.closeOverlay = Dialog.close;
@@ -599,170 +790,98 @@ const idb = (() => {
 		Object.assign(cancelButton, {
 			type: "button",
 			className: "saveMenuButton saveMenuConfirm",
-			value: "Cancel",
+			value: L10n.get("cancel"),
 			onclick: () => saveList("show saves"),
 		});
 
 		// prepare old save info (if provided)
-		const oldSaveDescription = document.createDocumentFragment();
-		if (details && details.date) {
-			oldSaveDescription.appendChild(document.createElement("p"));
-			oldSaveDescription.lastChild.innerText = "Title: " + details.title;
-			oldSaveDescription.appendChild(document.createElement("p"));
-			oldSaveDescription.lastChild.innerText =
-				(details.metadata.saveName ? "Save Name: " + details.metadata.saveName : "Save Id: " + details.metadata.saveId) +
-				", Date: " +
-				new Date(details.date).toLocaleString();
+		function generateOldSaveDescription(details) {
+			const oldSaveDescription = document.createDocumentFragment();
+			if (!details || !details.date) return oldSaveDescription;
+
+			const oldSaveTitle = document.createElement("p");
+			oldSaveTitle.innerText = L10n.get("savesDescTitle") + details.title;
+
+			const oldSaveData = document.createElement("p");
+			oldSaveData.innerText =
+				(details.metadata.saveName ? L10n.get("savesDescName") + details.metadata.saveName : L10n.get("savesDescId") + details.metadata.saveId)
+				+ L10n.get("savesDescDate")
+				+ new Date(details.date).toLocaleString();
+
+			oldSaveDescription.append(oldSaveTitle, oldSaveData);
+
+			return oldSaveDescription;
 		}
 
 		switch (mode) {
 			case "show saves": {
 				// print saves list
 				// show the warnings
-				if (V.replayScene || Story.get(State.passage).tags.includes("nosave")) {
-					list.appendChild(document.createElement("h3"));
-					list.lastChild.className = "red";
-					if (V.replayScene) list.lastChild.innerText = "The scene viewer is currently in use, preventing the use of the save system.";
-					else list.lastChild.innerText = "You can't save here!";
+				if (!savesAllowed()) {
+					const notAllowedWarning = document.createElement("h3");
+					notAllowedWarning.className = "red";
+					notAllowedWarning.innerText = V.replayScene ? L10n.get("savesDisallowedReplay") : L10n.get("savesDisallowed");
+					list.appendChild(notAllowedWarning);
 				}
-				list.appendChild(document.createElement("p"));
-				list.lastChild.innerText =
-					"Saves here will be lost if your browser cache is cleared. Exporting is recommended to prevent the loss of saves from occurring.";
 
-				const lostSaves = document.createElement("p");
-				lostSaves.innerHTML = "<i class=\"description\"><u>Where are my saves?</u></i> ";
-				const lostSavesTooltip = document.createElement("mouse");
-				lostSavesTooltip.classList.add("tooltip", "linkBlue");
-				lostSavesTooltip.innerText = "(?)";
-				lostSavesTooltip.appendChild(document.createElement("span"));
-				lostSavesTooltip.lastChild.innerText = `If you can't find your saves, it's possible you saved them using a different storage method. Try toggling the "Use old legacy storage" option below the saves list.`;
-				lostSaves.appendChild(lostSavesTooltip);
-				list.appendChild(lostSaves);
+				const exportReminder = document.createElement("p");
+				exportReminder.innerText = L10n.get("savesExportReminder");
+				list.appendChild(exportReminder);
+
+				// extra saves warning
+				if (extraSaveWarn) {
+					const lostSaves = document.createElement("p");
+					lostSaves.innerHTML = "<i class=\"description\"><u>Where are my saves?</u></i> ";
+					const lostSavesTooltip = document.createElement("mouse");
+					lostSavesTooltip.classList.add("tooltip", "linkBlue");
+					lostSavesTooltip.innerText = "(?)";
+					lostSavesTooltip.appendChild(document.createElement("span"));
+					lostSavesTooltip.lastChild.innerText = "If you can't find your saves, it's possible you saved them using a different storage method. Try toggling the \"Use old legacy storage\" option below the saves list.";
+					lostSaves.appendChild(lostSavesTooltip);
+					list.appendChild(lostSaves);
+				}
 
 
 				// THE SAVES LIST
 				list.appendChild(showSavesList());
 
 				// add pager
-				// previous page button
-				const prevPage = document.createElement("input");
-				Object.assign(prevPage, {
-					type: "button",
-					value: " < ",
-					disabled: listPage === 1,
-					onclick: () => {
-						if (listPage > 1) listPage--;
-						saveList();
-					},
-				});
-
-				// page number input
-				const pageNum = document.createElement("input");
-				Object.assign(pageNum, {
-					id: "pageNum",
-					type: "number",
-					value: listPage,
-					style: "width: 3em",
-					min: 1,
-					max: listPageMax,
-					onchange: () => {
-						listPage = Math.clamp(Math.round(pageNum.value), 1, listPageMax);
-						saveList();
-					},
-				});
-
-				// next page button
-				const nextPage = document.createElement("input");
-				Object.assign(nextPage, {
-					type: "button",
-					value: " > ",
-					disabled: listPage >= listPageMax,
-					onclick: () => {
-						if (listPage < listPageMax) listPage++;
-						saveList();
-					},
-				});
-
-				// list length input
-				const pageLen = document.createElement("input");
-				Object.assign(pageLen, {
-					id: "pageLen",
-					type: "number",
-					value: listLength,
-					style: "width: 3em",
-					min: 1,
-					max: listLengthMax,
-					onchange: () => {
-						listLength = Math.clamp(pageLen.value, 1, listLengthMax);
-						saveList();
-					},
-				});
-
-				// jump to most recent save button
-				const jumpToLatest = document.createElement("input");
-				Object.assign(jumpToLatest, {
-					type: "button",
-					value: " Jump to most recent manual save ",
-					onclick: () => {
-						// potentially exploitable to allow saving to slots way above the limit, but the limit is arbitrary to begin with, and idb doesn't actually suffer one bit from going beyond that limit
-						listPage = Math.floor((latestSave.slot - 1) / listLength + 1);
-						saveList();
-						setTimeout(() => {
-							const el = document.getElementById("latestSaveRow");
-							if (el != null) {
-								el.classList.remove("jumpToSaveTransition");
-								el.classList.add("jumpToSaveTransition");
-							}
-						}, Engine.minDomActionDelay);
-					},
-				});
-
-				const pager = document.createElement("div");
-				pager.append("Page: ");
-				pager.appendChild(prevPage);
-				pager.appendChild(pageNum);
-				pager.appendChild(nextPage);
-				pager.append(" Saves per page: ");
-				pager.appendChild(pageLen);
-				pager.appendChild(jumpToLatest);
-
-				list.appendChild(pager);
+				list.appendChild(generatePager());
 
 				// add confirmation toggles
+				const reqSaveLabel = document.createElement("label");
+				reqSaveLabel.innerText = L10n.get("savesLabelSave") + " ";
 				const reqSave = document.createElement("input");
 				Object.assign(reqSave, {
 					type: "checkbox",
 					checked: V.confirmSave,
 					onchange: () => V.confirmSave = reqSave.checked,
 				});
-				list.appendChild(document.createElement("label"));
-				list.lastChild.append(reqSave);
-				list.lastChild.append(" Require confirmation on Save ");
-				list.append(document.createElement("br"));
+				reqSaveLabel.appendChild(reqSave);
 
+				const reqLoadLabel = document.createElement("label");
+				reqLoadLabel.innerText = L10n.get("savesLabelLoad") + " ";
 				const reqLoad = document.createElement("input");
 				Object.assign(reqLoad, {
 					type: "checkbox",
 					checked: V.confirmLoad,
 					onchange: () => V.confirmLoad = reqLoad.checked,
 				});
-				list.appendChild(document.createElement("label"));
-				list.lastChild.append(reqLoad);
-				list.lastChild.append(" Require confirmation on Load ");
-				list.append(document.createElement("br"));
+				reqLoadLabel.append(reqLoad);
 
+				const reqDeleteLabel = document.createElement("label");
+				reqDeleteLabel.innerText = L10n.get("savesLabelDelete") + " ";
 				const reqDelete = document.createElement("input");
 				Object.assign(reqDelete, {
 					type: "checkbox",
 					checked: V.confirmDelete,
 					onchange: () => V.confirmDelete = reqDelete.checked,
 				});
-				list.appendChild(document.createElement("label"));
-				list.lastChild.append(reqDelete);
-				list.lastChild.append(" Require confirmation on Delete ");
-				list.append(document.createElement("br"));
+				reqDeleteLabel.appendChild(reqDelete);
 
 				// add instant idb switcher
+				const idbToggleLabel = document.createElement("label");
+				idbToggleLabel.innerText = L10n.get("savesOptionsUseLegacy");
 				const idbToggle = document.createElement("input");
 				Object.assign(idbToggle, {
 					type: "checkbox",
@@ -775,9 +894,9 @@ const idb = (() => {
 						}
 					},
 				});
-				list.appendChild(document.createElement("label"));
-				list.lastChild.append(idbToggle);
-				list.lastChild.append(" Use old legacy save storage ");
+				idbToggleLabel.appendChild(idbToggle);
+
+				list.append(L10n.get("savesOptionsConfirmOn"), "[ ", reqSaveLabel, " ] [ ", reqLoadLabel, " ] [ ", reqDeleteLabel, " ]", document.createElement("br"), idbToggleLabel);
 
 				setTimeout(() => {
 					savesDiv.innerHTML = "";
@@ -791,36 +910,31 @@ const idb = (() => {
 				break;
 			}
 			case "confirm save": {
-				// skip confirmation if the slot is empty, but do not skip on saveId mismatch, even if confirmation not required
+				// skip confirmation if the slot is empty, but do not skip on saveId mismatch, even if confirmation is not required
 				if (!details.date || !V.confirmSave && details.metadata.saveId === V.saveId) return saveState(details.slot).then(window.closeOverlay());
-				const confirmSave = document.createElement("div");
-				confirmSave.className = "saveBorder";
-				confirmSave.appendChild(document.createElement("h3"));
-				confirmSave.lastChild.className = "red";
-				if (details.date === "") {
-					confirmSave.lastChild.innerText = "Save on slot " + details.slot;
-				} else {
-					confirmSave.lastChild.innerText = "Overwrite save in slot " + details.slot;
-					confirmSave.appendChild(oldSaveDescription);
-				}
+				const confirmSaveWarning = document.createElement("div");
+				confirmSaveWarning.className = "saveBorder";
+
+				const confirmSaveWarningTitle = document.createElement("h3");
+				confirmSaveWarningTitle.className = "red";
+				confirmSaveWarningTitle.innerText = (details.date === "" ? L10n.get("savesWarningSaveOnSlot") : L10n.get("savesWarningOverwriteSlot")) + details.slot + "?";
+
 				if (details.date && V.saveId !== details.metadata.saveId) {
-					confirmSave.appendChild(document.createElement("span"));
-					confirmSave.lastChild.className = "red";
-					confirmSave.lastChild.innerText = "Save ID does not match, continue with overwrite?";
+					const overwriteWarning = document.createElement("span");
+					overwriteWarning.className = "red";
+					overwriteWarning.innerText = L10n.get("savesWarningOverwriteID");
 				}
 
 				const saveButton = document.createElement("input");
 				Object.assign(saveButton, {
 					type: "button",
 					className: "saveMenuButton saveMenuConfirm",
-					value: "Save",
+					value: L10n.get("savesLabelSave"),
 					onclick: () => saveState(details.slot).then(() => window.closeOverlay()),
 				});
-				confirmSave.appendChild(document.createElement("div"));
-				confirmSave.lastChild.appendChild(saveButton);
-				confirmSave.lastChild.appendChild(cancelButton);
+				confirmSaveWarning.append(confirmSaveWarningTitle, generateOldSaveDescription(details), saveButton, cancelButton);
 
-				list.appendChild(confirmSave);
+				list.appendChild(confirmSaveWarning);
 				setTimeout(() => {
 					savesDiv.innerHTML = "";
 					savesDiv.append(list);
@@ -830,25 +944,23 @@ const idb = (() => {
 			case "confirm delete": {
 				// skip confirmation if corresponding toggle is off
 				if (!V.confirmDelete) return deleteItem(details.slot).then(() => saveList());
-				const confirmDelete = document.createElement("div");
-				confirmDelete.className = "saveBorder";
-				confirmDelete.appendChild(document.createElement("h3"));
-				confirmDelete.lastChild.className = "red";
-				confirmDelete.lastChild.innerText = "Delete save in slot " + (details.slot === 0 ? "auto" : details.slot);
-				confirmDelete.appendChild(oldSaveDescription);
+				const confirmDeleteWarning = document.createElement("div");
+				confirmDeleteWarning.className = "saveBorder";
+				const confirmDeleteWarningTitle = document.createElement("h3");
+				confirmDeleteWarningTitle.className = "red";
+				confirmDeleteWarningTitle.innerText = L10n.get("savesWarningDeleteInSlot") + (details.slot === 0 ? "auto" : details.slot) + "?";
 
 				const deleteButton = document.createElement("input");
 				Object.assign(deleteButton, {
 					type: "button",
 					className: "saveMenuButton saveMenuConfirm",
-					value: "Delete",
+					value: L10n.get("savesLabelDelete"),
 					onclick: () => deleteItem(details.slot).then(() => saveList()),
 				});
-				confirmDelete.appendChild(document.createElement("div"));
-				confirmDelete.lastChild.append(deleteButton);
-				confirmDelete.lastChild.appendChild(cancelButton);
 
-				list.appendChild(confirmDelete);
+				confirmDeleteWarning.append(confirmDeleteWarningTitle, generateOldSaveDescription(details), deleteButton, cancelButton);
+
+				list.appendChild(confirmDeleteWarning);
 				setTimeout(() => {
 					savesDiv.innerHTML = "";
 					savesDiv.append(list);
@@ -860,21 +972,18 @@ const idb = (() => {
 				if (!V.confirmLoad) return loadState(details.slot).then(() => window.closeOverlay());
 				const confirmLoad = document.createElement("div");
 				confirmLoad.className = "saveBorder";
-				confirmLoad.appendChild(document.createElement("h3"));
-				confirmLoad.lastChild.className = "red";
-				confirmLoad.lastChild.innerText = "Load slot " + (details.slot === 0 ? "auto" : details.slot);
-				confirmLoad.appendChild(oldSaveDescription);
+				const confirmLoadTitle = document.createElement("h3");
+				confirmLoadTitle.className = "red";
+				confirmLoadTitle.innerText = L10n.get("savesWarningLoad") + (details.slot === 0 ? "auto" : details.slot) + "?";
 
 				const loadButton = document.createElement("input");
 				Object.assign(loadButton, {
 					type: "button",
 					className: "saveMenuButton saveMenuConfirm",
-					value: "Load",
+					value: L10n.get("savesLabelLoad"),
 					onclick: () => idb.loadState(details.slot).then(() => window.closeOverlay()),
 				});
-				confirmLoad.appendChild(document.createElement("div"));
-				confirmLoad.lastChild.append(loadButton);
-				confirmLoad.lastChild.appendChild(cancelButton);
+				confirmLoad.append(confirmLoadTitle, generateOldSaveDescription(details), loadButton, cancelButton);
 
 				list.appendChild(confirmLoad);
 				setTimeout(() => {
@@ -887,20 +996,18 @@ const idb = (() => {
 				// storage wipes always require confirmation
 				const confirmClear = document.createElement("div");
 				confirmClear.className = "saveBorder";
-				confirmClear.appendChild(document.createElement("h2"));
-				confirmClear.lastChild.className = "red";
-				confirmClear.lastChild.innerText = "WARNING - Are you sure you would like to delete all saves?";
+				const confirmClearTitle = document.createElement("h2");
+				confirmClearTitle.className = "red";
+				confirmClearTitle.innerText = L10n.get("savesWarningDeleteAll");
 
 				const clearButton = document.createElement("input");
 				Object.assign(clearButton, {
 					type: "button",
 					className: "saveMenuButton saveMenuConfirm",
-					value: "Clear All Saves",
+					value: L10n.get("savesLabelClear"),
 					onclick: () => clearAll().then(() => saveList()),
 				});
-				confirmClear.appendChild(document.createElement("div"));
-				confirmClear.lastChild.append(clearButton);
-				confirmClear.lastChild.appendChild(cancelButton);
+				confirmClear.append(confirmClearTitle, clearButton, cancelButton);
 
 				list.appendChild(confirmClear);
 				setTimeout(() => {
@@ -953,11 +1060,17 @@ const idb = (() => {
 		loadState,
 		importFromLocalStorage,
 		saveList,
-		footerHTML,
+		get footerHTML() {
+			return footerHTML;
+		},
+		set footerHTML(val) {
+			return footerHTML = val;
+		},
 		init(dbName) {
 			return openDB(dbName);
 		},
 		baddies,
+		db,
 	});
 })();
 window.idb = idb;
