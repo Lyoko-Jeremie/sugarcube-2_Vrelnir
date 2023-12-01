@@ -72,6 +72,7 @@ const idb = (() => {
 		return Math.floor(Math.random() * 90000) + 10000;
 	}
 
+	const baddies = [];
 	/**
 	 * scan and stringify functions that wormed their way into story vars
 	 * and other objects with custom toJSON revivals
@@ -79,8 +80,8 @@ const idb = (() => {
 	 * @param {object} target to scan
 	 * @param {object} path to report
 	 */
-	const baddies = [];
-	function funNuke(target = V, path = "", verbose = true) {
+	function funNuke(target, path = "", verbose = true) {
+		if (!target) return console.log("no target specified");
 		for (const key in target) {
 			const value = target[key];
 			const newPath = path + "['" + key + "']";
@@ -95,7 +96,6 @@ const idb = (() => {
 			} else if (typeof value === "object") funNuke(value, newPath, verbose);
 		}
 	}
-	window.funNuke = funNuke;
 
 	/**
 	 * restore nuked functions and other nasty stuff
@@ -132,7 +132,6 @@ const idb = (() => {
 			paths.shift();
 		}
 	}
-	window.ekuNnuf = ekuNnuf;
 
 	/**
 	 * copy saves from localStorage into indexedDB, without regard to what's already in there
@@ -1070,7 +1069,8 @@ const idb = (() => {
 			return openDB(dbName);
 		},
 		baddies,
-		db,
+		funNuke,
+		ekuNnuf,
 	});
 })();
 window.idb = idb;

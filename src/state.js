@@ -183,8 +183,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns the current story state marshaled into a save-compatible serializable object.
 	*/
-	function stateMarshalForSave(depth = 100) {
-		return stateMarshal(true, depth);
+	function stateMarshalForSave(depth = 100, noDelta = true) {
+		return stateMarshal(noDelta, depth, true);
 	}
 
 	/*
