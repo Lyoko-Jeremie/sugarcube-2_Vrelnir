@@ -1056,7 +1056,7 @@
 
 				while (evalJavaScript(condition)) {
 					if (Wikifier.stopWikify) return;
-					
+
 					if (--safety < 0) {
 						return this.error(`exceeded configured maximum loop iterations (${Config.macros.maxLoopIterations})`);
 					}
@@ -3854,8 +3854,34 @@
 								const resFrag = document.createDocumentFragment();
 								const errList = [];
 
-								// Wikify the widget's code.
-								new Wikifier(resFrag, widgetCode, undefined, macroThis.passageObj);
+								// before widget hook
+								if (
+									typeof window.modSC2DataManager !== 'undefined' &&
+									window.modSC2DataManager.getWikifyTracer?.()?.beforeWidget
+								) {
+									const newWidgetCode = window.modSC2DataManager.getWikifyTracer().beforeWidget(
+										widgetCode,
+										widgetName,
+										macroThis.passageTitle,
+										macroThis.passageObj
+									);
+									// Wikify the widget's code.
+									new Wikifier(resFrag, newWidgetCode, undefined, macroThis.passageObj);
+								}
+								else {
+									// Wikify the widget's code.
+									new Wikifier(resFrag, widgetCode, undefined, macroThis.passageObj);
+								}
+
+								// after widget hook
+								if (typeof window.modSC2DataManager !== 'undefined') {
+									window.modSC2DataManager.getWikifyTracer?.()?.afterWidget?.(
+										widgetCode,
+										widgetName,
+										macroThis.passageTitle,
+										macroThis.passageObj
+									);
+								}
 
 								// Carry over the output, unless there were errors.
 								Array.from(resFrag.querySelectorAll('.error')).forEach(errEl => {

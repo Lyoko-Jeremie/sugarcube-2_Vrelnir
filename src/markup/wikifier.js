@@ -46,6 +46,13 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 				}
 				_lastPassageQ = [];
 				_lastPassageQ.push({ passageObj : _passageObjLast, passageTitle : _passageTitleLast });
+				// before passage hook
+				if (typeof window.modSC2DataManager !== 'undefined' &&
+					window.modSC2DataManager.getWikifyTracer().beforePassage
+				) {
+					// eslint-disable-next-line no-param-reassign
+					source = window.modSC2DataManager.getWikifyTracer().beforePassage(source, _passageTitleLast, _passageObjLast);
+				}
 			}
 			else {
 				if (passageObj || passageTitle) {
@@ -157,6 +164,13 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 			try {
 				++_callDepth;
 
+				// before any level hook
+				if (typeof window.modSC2DataManager !== 'undefined' &&
+					window.modSC2DataManager.getWikifyTracer().beforeWikify
+				) {
+					this.source = window.modSC2DataManager.getWikifyTracer().beforeWikify(source);
+				}
+
 				this.subWikify(this.output, undefined, undefined, passageObj);
 
 				// Limit line break conversion to non-recursive calls.
@@ -165,6 +179,11 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 				}
 			}
 			finally {
+				// after any level hook
+				if (typeof window.modSC2DataManager !== 'undefined') {
+					window.modSC2DataManager.getWikifyTracer?.()?.afterWikify?.(source);
+				}
+
 				--_callDepth;
 
 				const lp = _lastPassageQ.pop();
@@ -172,6 +191,10 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 				_passageObjLast = lp.passageObj;
 
 				if (_callDepth === 0) {
+					// after passage hook
+					if (typeof window.modSC2DataManager !== 'undefined') {
+						window.modSC2DataManager.getWikifyTracer?.()?.afterPassage?.(source, _passageTitleLast, _passageObjLast);
+					}
 					_passageTitleLast = '';
 					_passageObjLast = undefined;
 					if (_lastPassageQ.length !== 0) {
