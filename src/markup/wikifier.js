@@ -48,7 +48,7 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 				_lastPassageQ.push({ passageObj : _passageObjLast, passageTitle : _passageTitleLast });
 				// before passage hook
 				if (typeof window.modSC2DataManager !== 'undefined' &&
-					window.modSC2DataManager.getWikifyTracer().beforePassage
+					window.modSC2DataManager.getWikifyTracer?.().beforePassage
 				) {
 					// eslint-disable-next-line no-param-reassign
 					source = window.modSC2DataManager.getWikifyTracer().beforePassage(source, _passageTitleLast, _passageObjLast);
@@ -166,7 +166,7 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 
 				// before any level hook
 				if (typeof window.modSC2DataManager !== 'undefined' &&
-					window.modSC2DataManager.getWikifyTracer().beforeWikify
+					window.modSC2DataManager.getWikifyTracer?.().beforeWikify
 				) {
 					this.source = window.modSC2DataManager.getWikifyTracer().beforeWikify(source);
 				}
