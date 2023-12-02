@@ -102,6 +102,14 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 				Wikifier.Parser.Profile.compile();
 			}
 
+			// before any level hook
+			if (typeof window.modSC2DataManager !== 'undefined' &&
+				window.modSC2DataManager.getWikifyTracer?.().beforeWikify
+			) {
+				// eslint-disable-next-line no-param-reassign
+				source = window.modSC2DataManager.getWikifyTracer().beforeWikify(source);
+			}
+
 			Object.defineProperties(this, {
 				passageObj : {
 					writable : true,
@@ -164,13 +172,6 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 			try {
 				++_callDepth;
 
-				// before any level hook
-				if (typeof window.modSC2DataManager !== 'undefined' &&
-					window.modSC2DataManager.getWikifyTracer?.().beforeWikify
-				) {
-					this.source = window.modSC2DataManager.getWikifyTracer().beforeWikify(source);
-				}
-
 				this.subWikify(this.output, undefined, undefined, passageObj);
 
 				// Limit line break conversion to non-recursive calls.
@@ -179,12 +180,12 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 				}
 			}
 			finally {
+				--_callDepth;
+
 				// after any level hook
 				if (typeof window.modSC2DataManager !== 'undefined') {
 					window.modSC2DataManager.getWikifyTracer?.()?.afterWikify?.(source);
 				}
-
-				--_callDepth;
 
 				const lp = _lastPassageQ.pop();
 				_passageTitleLast = lp.passageTitle;

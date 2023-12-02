@@ -3862,7 +3862,7 @@
 									const newWidgetCode = window.modSC2DataManager.getWikifyTracer().beforeWidget(
 										widgetCode,
 										widgetName,
-										macroThis.passageTitle,
+										macroThis.passageTitle || macroThis.passageObj.title,
 										macroThis.passageObj
 									);
 									// Wikify the widget's code.
@@ -3878,7 +3878,7 @@
 									window.modSC2DataManager.getWikifyTracer?.()?.afterWidget?.(
 										widgetCode,
 										widgetName,
-										macroThis.passageTitle,
+										macroThis.passageTitle || macroThis.passageObj.title,
 										macroThis.passageObj
 									);
 								}
