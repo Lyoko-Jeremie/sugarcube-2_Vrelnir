@@ -267,14 +267,22 @@ jQuery(() => {
 
 	// inject ModLoader on there
 	if (typeof window.modSC2DataManager !== 'undefined') {
+		// eslint-disable-next-line no-alert
+		// alert('start modSC2DataManager');
 		window.modSC2DataManager.startInit()
 			.then(() => window.jsPreloader.startLoad())
+			// eslint-disable-next-line no-alert
+			// .then(() => alert('modSC2DataManager ok'))
 			.then(() => mainStart())
 			.catch(err => {
 				console.error(err);
+				// eslint-disable-next-line no-alert
+				// alert(`Error loading mod data: ${err?.message ? err.message : err}`);
 			});
 	}
 	else {
+		// eslint-disable-next-line no-alert
+		// alert('cannot find modSC2DataManager');
 		mainStart();
 	}
 });
