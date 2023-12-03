@@ -184,7 +184,7 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 
 				// after any level hook
 				if (typeof window.modSC2DataManager !== 'undefined') {
-					window.modSC2DataManager.getWikifyTracer?.()?.afterWikify?.(source);
+					window.modSC2DataManager.getWikifyTracer?.()?.afterWikify?.(source, this.output);
 				}
 
 				const lp = _lastPassageQ.pop();
@@ -194,7 +194,7 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 				if (_callDepth === 0) {
 					// after passage hook
 					if (typeof window.modSC2DataManager !== 'undefined') {
-						window.modSC2DataManager.getWikifyTracer?.()?.afterPassage?.(source, _passageTitleLast, _passageObjLast);
+						window.modSC2DataManager.getWikifyTracer?.()?.afterPassage?.(source, _passageTitleLast, _passageObjLast, this.output);
 					}
 					_passageTitleLast = '';
 					_passageObjLast = undefined;

@@ -3879,7 +3879,8 @@
 										widgetCode,
 										widgetName,
 										macroThis.passageTitle || macroThis.passageObj.title,
-										macroThis.passageObj
+										macroThis.passageObj,
+										resFrag
 									);
 								}
 
