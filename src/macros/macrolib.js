@@ -1045,7 +1045,7 @@
 
 				while (evalJavaScript(condition)) {
 					if (Wikifier.stopWikify) return;
-					
+
 					if (--safety < 0) {
 						return this.error(`exceeded configured maximum loop iterations (${Config.macros.maxLoopIterations})`);
 					}
@@ -3430,7 +3430,7 @@
 				// Argument was simply the passage name.
 				passage = this.args[0];
 			}
-			$link.append(document.createTextNode(passage))
+			$link.append(document.createTextNode(passage));
 
 			if (!Story.has(passage)) {
 				return this.error(`passage "${passage}" does not exist`);

@@ -34,7 +34,7 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 
 	// Navigation settings.
 	let _navigationOverride;
-	let _gotoButtons = true;
+	let _gotoButtons = false;
 
 	// Passages settings.
 	let _passagesDescriptions;
