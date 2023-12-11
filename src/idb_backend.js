@@ -199,8 +199,10 @@ const idb = (() => {
 	function importFromLocalStorage() {
 		// use the `Promise-then` Design Patterns to similar the `async-await` Design Patterns, to avoid use async-await
 		const oldSaves = Save.get();
+		// NOTE: we are start from `Promise.resolve()` state to begin the running.
 		return Promise.resolve()
 			.then(() => {
+				// NOTE: do the sync part, util next await statement
 				const autoSave = oldSaves.autosave;
 				if (autoSave != null) {
 					// autosave was moved from a separate slot in old system to just 0 in new
@@ -224,13 +226,15 @@ const idb = (() => {
 						title: autoSave.title,
 						metadata: autoSave.metadata || { saveId: save.history.last().variables.saveId, saveName: save.history.last().variables.saveName },
 					};
+					// NOTE: use `then-return` to impl the `async-await` Design Patterns, return the `Promise` to let the `.then()` callback to resolve the Promise
 					// setItem only allows one operation at a time to prevent possible exploits, so wait for it to finish
 					return setItem(0, save, { slot: 0, data });
-					// NOTE: use `then-return` to impl the `async-await` Design Patterns
 				}
 			})
-			// NOTE: follow code same as `for (let i = 0; i < 8; i++) { ... await ... }` Design Patterns , but impl with `reduce`
-			//    use the :
+			// NOTE: use the `.then` to wait above last `Promise` resolve, and then do the follow operation.
+			// NOTE: follow code same as `for (let i = 0; i < 8; i++) { ... await ... }` Design Patterns ,
+			// 		 but impl with `reduce` to chain all `Promise` that in every loop body and then use `then` to wait the `Promise` chain resolve.
+			//   this use the :
 			//    		`["for loop condition times"].reduce(
 			//    				"for loop body `lastPromise.then` ",
 			//    				"for statement start condition `firstPromise`"
