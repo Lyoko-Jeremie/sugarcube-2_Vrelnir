@@ -364,7 +364,7 @@ function compileStyles(config) {
 		if (!excludeRE.test(filename)) {
 			css = `${mixinContent}\n${css}`;
 
-			const processed = postcss([mixins, autoprefixer]).process(css, { from : filename });
+			const processed = postcss([mixins]).process(css, { from : filename });
 
 			css = processed.css;
 
@@ -374,7 +374,7 @@ function compileStyles(config) {
 		if (!_opt.options.unminified) {
 			css = new CleanCSS({
 				level         : 1,
-				compatibility : 'ie9'
+				compatibility : '*'
 			})
 				.minify(css)
 				.styles;

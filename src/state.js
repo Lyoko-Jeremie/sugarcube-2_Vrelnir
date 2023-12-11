@@ -92,7 +92,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns the current story state marshaled into a serializable object.
 	*/
-	function stateMarshal(noDelta = true, depth = Config.history.maxSessionStates) {
+	function stateMarshal(noDelta = true, depth = Config.history.maxSessionStates, useClone = false) {
 		if (depth === 0) return null; // don't bother
 		/*
 			Gather the properties.
@@ -101,8 +101,11 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		const stateObj = { index : _activeIndex };
 		const hsize = _history.length; // how many frames are currently in the history
 		let history = [];
-		if (depth === 1) { history = [clone(_history[_activeIndex])]; stateObj.index = 0; }
-		else if (depth >= hsize) history = clone(_history);
+		if (depth === 1 || hsize === 1) {
+			history = [useClone ? clone(_history[_activeIndex]) : _history[_activeIndex]];
+			stateObj.index = 0;
+		}
+		else if (depth >= hsize) history = useClone ? clone(_history) : _history;
 		else { // fuck.gif
 			// pick up which frames to preserve, aiming at preserving the frames both before and after the active one
 			const ssize = Math.min(depth, hsize); // how many frames will go into session (s for session)
@@ -182,8 +185,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns the current story state marshaled into a save-compatible serializable object.
 	*/
-	function stateMarshalForSave(depth = 100) {
-		return stateMarshal(true, depth);
+	function stateMarshalForSave(depth = 100, noDelta = true) {
+		return stateMarshal(noDelta, depth, true);
 	}
 
 	/*

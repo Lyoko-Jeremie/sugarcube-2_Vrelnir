@@ -86,11 +86,36 @@ var l10nStrings = { // eslint-disable-line no-unused-vars, no-var
 	savesLabelExport : 'Save to Disk\u2026',
 	savesLabelImport : 'Load from Disk\u2026',
 	savesLabelLoad   : 'Load',
-	savesLabelClear  : 'Delete All',
+	savesLabelClear  : 'Delete All Saves',
 	savesLabelSave   : 'Save',
 	savesLabelSlot   : 'Slot',
 	savesUnavailable : 'No save slots found\u2026',
 	savesUnknownDate : 'unknown',
+
+	/*
+		idb related
+	*/
+	savesDisallowedReplay     : 'The scene viewer is currently in use, preventing the use of the save system.',
+	savesExportReminder       : 'Saves here will be lost if your browser cache is cleared. Exporting is recommended to prevent the loss of saves from occurring.',
+	savesHeaderSaveLoad       : 'Save/Load',
+	savesHeaderIDName         : 'ID/Name',
+	savesHeaderDetails        : 'Details',
+	savesDescTitle            : 'Title: ',
+	savesDescName             : 'Save Name: ',
+	savesDescId               : 'Save Id: ',
+	savesDescDate             : ', Date: ',
+	savesPagerJump            : ' Jump to most recent manual save ',
+	savesPagerPage            : 'Page: ',
+	savesPagerSavesPerPage    : ' Saves per page: ',
+	savesOptionsConfirmOn     : ' Require confirmation on: ',
+	savesOptionsUseLegacy     : ' Use old legacy save storage: ',
+	savesWarningSaveOnSlot    : 'Save on slot ',
+	savesWarningOverwriteSlot : 'Overwrite save in slot ',
+	savesWarningOverwriteID   : 'Save ID does not match, continue with overwrite?',
+	savesWarningDeleteInSlot  : 'Delete save in slot ',
+	savesWarningLoad          : 'Load slot ',
+	savesWarningDeleteAll     : 'WARNING - DO YOU REALLY WANT TO DELETE ALL SAVES?',
+
 
 	/*
 		Settings.
