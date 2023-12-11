@@ -3453,7 +3453,7 @@
 				// Argument was simply the passage name.
 				passage = this.args[0];
 			}
-			$link.append(document.createTextNode(passage))
+			$link.append(document.createTextNode(passage));
 
 			if (!Story.has(passage)) {
 				return this.error(`passage "${passage}" does not exist`);
