@@ -240,7 +240,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (Config.history.maxSessionStates === 0) return;
 
 		const sessionState = session.get("state");
-		if (Object.hasOwn(sessionState, "delta")) {
+		// if (Object.hasOwn(sessionState, "delta")) {
+		if (sessionState.hasOwnProperty("delta")) {
 			sessionState.history = State.deltaDecode(sessionState.delta);
 			delete sessionState.delta;
 		}

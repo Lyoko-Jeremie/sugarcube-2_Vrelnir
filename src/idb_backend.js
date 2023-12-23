@@ -241,7 +241,8 @@ const idb = (() => {
 	 */
 	function setItem(slot, saveObj, details) {
 		if (lock) return;
-		if (saveObj == null || !Object.hasOwn(saveObj, "history")) return false;
+		// if (saveObj == null || !Object.hasOwn(saveObj, "history")) return false;
+		if (saveObj == null || !saveObj.hasOwnProperty("history")) return false;
 		lock = true;
 
 		// prepare save details
