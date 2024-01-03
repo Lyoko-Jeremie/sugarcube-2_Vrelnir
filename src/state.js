@@ -87,6 +87,30 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		return false;
 	}
 
+	function reduceHistorySize(stateObj, targetSize) {
+		if (!targetSize) return;
+		// pick up which frames to preserve, aiming at preserving the frames both before and after the active one
+		const currentIndex = stateObj.index;
+		const currentHistoryLength = stateObj.history.length;
+		targetSize = Math.min(currentHistoryLength, targetSize);
+		const invertedIndex = currentHistoryLength - 1 - currentIndex;
+		let startingIndex = 0;
+		const radius = Math.floor(targetSize / 2); // how many frames can we cover on both sides from active frame
+
+		if (currentIndex < invertedIndex) { // active index is closer to the beginning of the array [* i * * * *]
+			if (radius >= currentIndex) startingIndex = 0 // there's enough space to include the oldest frame [(* i *) * * *]
+			else startingIndex = currentIndex - radius; // starting index will extend into the past as much as the radius can allow [* (* i *) * *]
+		}
+		else { // active index is closer to the end of the array [* * * * i *]
+			if (radius >= invertedIndex) startingIndex = currentHistoryLength - targetSize; //enough space to include the newest frame [* * * (* i *)]
+			else startingIndex = currentIndex - radius; // [* * (* i *) *]
+		}
+		stateObj.index -= startingIndex // correct the index
+		stateObj.history = stateObj.history.slice(startingIndex, startingIndex + targetSize);
+
+		return stateObj;
+	}
+
 	/*
 		Returns the current story state marshaled into a serializable object.
 	*/
@@ -95,36 +119,16 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		/*
 			Gather the properties.
 		*/
+		const stateObj = {
+			index : _activeIndex,
+			history : useClone ? clone(_history) : _history
+		};
 
-		const stateObj = { index : _activeIndex };
-		const hsize = _history.length; // how many frames are currently in the history
-		let history = [];
-		if (depth === 1 || hsize === 1) {
-			history = [useClone ? clone(_history[_activeIndex]) : _history[_activeIndex]];
-			stateObj.index = 0;
+		if (_history.length > depth) reduceHistorySize(stateObj, depth);
+		if (!noDelta) {
+			stateObj.delta = historyDeltaEncode(stateObj.history);
+			delete stateObj.history;
 		}
-		else if (depth >= hsize) history = useClone ? clone(_history) : _history;
-		else { // fuck.gif
-			// pick up which frames to preserve, aiming at preserving the frames both before and after the active one
-			const ssize = Math.min(depth, hsize); // how many frames will go into session (s for session)
-			const hindex = _activeIndex; // how far away active index is from the oldest history element (h for history)
-			const iindex = hsize - 1 - _activeIndex; // same but from the newest element (i for inverted)
-			let sindex = 0; // index to start copying frames from
-			const sradius = Math.floor(ssize / 2); // how many frames can we cover on both sides from active frame
-			if (hindex < iindex) { // active index is closer to the left side of the history array
-				if (sradius >= hindex) sindex = 0; // there's enough space to include the oldest frame
-				else sindex = hindex - sradius; // starting index will extend into the past as much as the radius will allow
-			}
-			else { // active index is closer to the right side
-				if (sradius >= iindex) sindex = hsize - ssize; // enough space to include the newest frame
-				else sindex = hindex - sradius;
-			}
-
-			stateObj.index -= sindex; // offset the marshalled index by the starting index
-			for (let i = sindex; i < sindex + ssize; i++) history.push(clone(_history[i]));
-		}
-		if (noDelta) stateObj.history = history;
-		else stateObj.delta = historyDeltaEncode(history);
 
 		if (_expired.length > 0) stateObj.expired = [..._expired];
 		if (_prng !== null && _prng.hasOwnProperty('seed')) stateObj.seed = _prng.seed;
@@ -262,11 +266,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		try {
 			// if history is bigger than session states limit, reduce the history to match
-			if (sessionState.history.length > sstates) {
-				const newState = State.marshalForSave(sstates);
-				sessionState.history = newState.history;
-				sessionState.index = newState.index;
-			}
+			if (sessionState.history.length > sstates) reduceHistorySize(sessionState, sstates);
 			if (sstates) session.set("state", sessionState); // don't do session writes if sstates is 0, NaN, undefined, etc.
 			pass = true;
 		} catch (ex) {
@@ -275,16 +275,16 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			while (sstates && !pass) {
 				try {
 					sstates--;
-					sessionState.history = State.marshalForSave(sstates).history;
-					sessionState.history.forEach(s => (s.variables.options.maxStates = sstates));
+					reduceHistorySize(sessionState, sstates);
 					session.set("state", sessionState);
 					pass = true;
 				} catch (ex) {
 					continue;
 				}
 			}
-			V.options.maxStates = Config.history.maxStates = Config.history.maxSessionStates = sstates;
-			Errors.report("Save data is too big for current History depth setting. It's value was automatically adjusted to " + V.maxStates);
+			Config.history.maxSessionStates = sstates;
+			if (V.options) V.options.maxSessionStates = sstates;
+			if (Errors) Errors.report("Save data is too big for current History depth setting. It's value was automatically adjusted to " + sstates);
 		}
 		return pass;
 	}
