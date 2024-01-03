@@ -262,7 +262,11 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		try {
 			// if history is bigger than session states limit, reduce the history to match
-			if (sessionState.history.length > sstates) sessionState.history = State.marshalForSave(sstates).history;
+			if (sessionState.history.length > sstates) {
+				const newState = State.marshalForSave(sstates);
+				sessionState.history = newState.history;
+				sessionState.index = newState.index;
+			}
 			if (sstates) session.set("state", sessionState); // don't do session writes if sstates is 0, NaN, undefined, etc.
 			pass = true;
 		} catch (ex) {
