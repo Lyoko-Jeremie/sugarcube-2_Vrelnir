@@ -54,8 +54,6 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		/* Have the PRNG object return a copy of the original.
 			Old: _prng = _prng === null ? null : new PRNGWrapper(_prng.seed, false); */
 		_prng        = _prng === null ? null : new PRNGWrapper(_prng.seed, { state : true });
-		// don't forget to reset V.saveId
-		V.saveId = Math.floor(Math.random() * 90000) + 10000;
 	}
 
 	/*
@@ -242,7 +240,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (Config.history.maxSessionStates === 0) return;
 
 		const sessionState = session.get("state");
-		if (Object.hasOwn(sessionState, "delta")) {
+		// if (Object.hasOwn(sessionState, "delta")) {
+		if (sessionState.hasOwnProperty("delta")) {
 			sessionState.history = State.deltaDecode(sessionState.delta);
 			delete sessionState.delta;
 		}
@@ -869,12 +868,12 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	 * alias story and temporary variables to the global namespace
 	 */
 	Object.defineProperties(window, {
-
+		// often redefined by individual games, needs to be configurable
 		/* Story variables property. */
 		// eslint-disable-next-line id-length
-		V : { get() { return _active.variables; } },
+		V : { get() { return _active.variables; }, configurable : true },
 		/* Temporary variables property. */
-		T : { get() { return _tempVariables; } }
+		T : { get() { return _tempVariables; }, configurable : true }
 	});
 
 	/*******************************************************************************************************************

@@ -134,152 +134,61 @@ const idb = (() => {
 	}
 
 	/**
-	 * NOTE: follow next function code is Exactly Equivalent as below code,
-	 * 			but impl with `Promise` instead `async-await` Design Patterns to avoid use `async-await` polyfill
-	 * ```
-	 * 	async function importFromLocalStorage() {
-	 * 		const oldSaves = Save.get();
-	 * 		const autoSave = oldSaves.autosave;
-	 * 		if (autoSave != null) {
-	 * 			// autosave was moved from a separate slot in old system to just 0 in new
-	 * 			const save = autoSave.state;
-	 * 			// there is no need for delta-compression in indexedDB, restore real history
-	 * 			if (save.jdelta) save.history = State.jdeltaDecode(save.delta, save.jdelta);
-	 * 			else if (save.delta) save.history = State.deltaDecode(save.delta);
-	 * 			delete save.jdelta;
-	 * 			delete save.delta;
-	 * 			// no need for json-compression either
-	 * 			if (window.DoLSave) DoLSave.decompressIfNeeded({ state: save });
-	 * 			// assign V.saveId if necessary
-	 * 			const saveIdNew = genSaveId();
-	 * 			save.history.forEach(s => {
-	 * 				if (!s.variables.saveId) s.variables.saveId = saveIdNew;
-	 * 			});
-	 *
-	 * 			const data = {
-	 * 				date: autoSave.date,
-	 * 				id: autoSave.id,
-	 * 				title: autoSave.title,
-	 * 				metadata: autoSave.metadata || { saveId: save.history.last().variables.saveId, saveName: save.history.last().variables.saveName },
-	 * 			};
-	 * 			// setItem only allows one operation at a time to prevent possible exploits, so wait for it to finish
-	 * 			await setItem(0, save, { slot: 0, data });
-	 * 		}
-	 * 		for (let i = 0; i < 8; i++) {
-	 * 			const slotSave = oldSaves.slots[i];
-	 * 			if (slotSave != null) {
-	 * 				const save = slotSave.state;
-	 * 				// same as for autosave
-	 * 				if (save.jdelta) save.history = State.jdeltaDecode(save.delta, save.jdelta);
-	 * 				else if (save.delta) save.history = State.deltaDecode(save.delta);
-	 * 				delete save.jdelta;
-	 * 				delete save.delta;
-	 * 				if (window.DoLSave) DoLSave.decompressIfNeeded({ state: save });
-	 * 				// remove known functions from old save data because indexedDB can not store them
-	 * 				save.history.forEach(s => delete s.variables.currentFurnishing);
-	 * 				const data = {
-	 * 					date: slotSave.date,
-	 * 					id: slotSave.id,
-	 * 					title: slotSave.title,
-	 * 					metadata: slotSave.metadata || { saveId: save.history.last().variables.saveId, saveName: save.history.last().variables.saveName },
-	 * 				};
-	 * 				await setItem(i + 1, save, { slot: i + 1, data });
-	 * 			}
-	 * 		}
-	 * 		console.log("idb migration successful");
-	 * 		return true;
-	 * 	}
-	 * 	```
-	 */
-	/**
 	 * copy saves from localStorage into indexedDB, without regard to what's already in there
 	 *
-	 * @returns {Promise<boolean>} success of the operation
+	 * @returns {boolean} success of the operation
 	 */
-	function importFromLocalStorage() {
-		// use the `Promise-then` Design Patterns to similar the `async-await` Design Patterns, to avoid use async-await
+	async function importFromLocalStorage() {
 		const oldSaves = Save.get();
-		// NOTE: we are start from `Promise.resolve()` state to begin the running.
-		return Promise.resolve()
-			.then(() => {
-				// NOTE: do the sync part, util next await statement
-				const autoSave = oldSaves.autosave;
-				if (autoSave != null) {
-					// autosave was moved from a separate slot in old system to just 0 in new
-					const save = autoSave.state;
-					// there is no need for delta-compression in indexedDB, restore real history
-					if (save.jdelta) save.history = State.jdeltaDecode(save.delta, save.jdelta);
-					else if (save.delta) save.history = State.deltaDecode(save.delta);
-					delete save.jdelta;
-					delete save.delta;
-					// no need for json-compression either
-					if (window.DoLSave) DoLSave.decompressIfNeeded({ state: save });
-					// assign V.saveId if necessary
-					const saveIdNew = genSaveId();
-					save.history.forEach(s => {
-						if (!s.variables.saveId) s.variables.saveId = saveIdNew;
-					});
-
-					const data = {
-						date: autoSave.date,
-						id: autoSave.id,
-						title: autoSave.title,
-						metadata: autoSave.metadata || { saveId: save.history.last().variables.saveId, saveName: save.history.last().variables.saveName },
-					};
-					// NOTE: use `then-return` to impl the `async-await` Design Patterns, return the `Promise` to let the `.then()` callback to resolve the Promise
-					// setItem only allows one operation at a time to prevent possible exploits, so wait for it to finish
-					return setItem(0, save, { slot: 0, data });
-				}
-			})
-			// NOTE: use the `.then` to wait above last `Promise` resolve, and then do the follow operation.
-			// NOTE: follow code same as `for (let i = 0; i < 8; i++) { ... await ... }` Design Patterns ,
-			// 		 but impl with `reduce` to chain all `Promise` that in every loop body and then use `then` to wait the `Promise` chain resolve.
-			//   this use the :
-			//    		`["for loop condition times"].reduce(
-			//    				"for loop body `lastPromise.then` ",
-			//    				"for statement start condition `firstPromise`"
-			//    		)`
-			//       and we transfer the start condition `firstPromise` to the "for loop body" callback`(lastPromise, i)=>thisPromise`
-			//       then check the last callback return Promise `lastPromise.then` to impl the `for loop condition`,
-			//       so we can impl the Exactly Equivalent behavior that an await statement will break the for-loop if it `Reject`.
-			//    it is Exactly Equivalent:
-			//       for(let i = 0; i < 8; i++) {
-			//			...
-			//			if ( "the return Promise of setItem() is Rejected" ) {
-			//				break;
-			//			} else {
-			//				continue;
-			//			}
-			//		 }
-			//	  and, the `[...Array(7).keys()]` meas `[ 0, 1, 2, 3, 4, 5, 6 ]`, so it will run 7 times.
-			//    BTW: if need add more `await` statement , simply add a `).then(` on the `await` statement place to split the function execution flow,
-			//    		to `wait` the Promise resolve like the `await` statement do.
-			.then(() => [...Array(7).keys()].reduce((lastPromise, i) => lastPromise.then(() => {
-				const slotSave = oldSaves.slots[i];
-				if (slotSave != null) {
-					const save = slotSave.state;
-					// same as for autosave
-					if (save.jdelta) save.history = State.jdeltaDecode(save.delta, save.jdelta);
-					else if (save.delta) save.history = State.deltaDecode(save.delta);
-					delete save.jdelta;
-					delete save.delta;
-					if (window.DoLSave) DoLSave.decompressIfNeeded({ state: save });
-					// remove known functions from old save data because indexedDB can not store them
-					save.history.forEach(s => delete s.variables.currentFurnishing);
-					const data = {
-						date: slotSave.date,
-						id: slotSave.id,
-						title: slotSave.title,
-						metadata: slotSave.metadata || { saveId: save.history.last().variables.saveId, saveName: save.history.last().variables.saveName },
-					};
-					return setItem(i + 1, save, { slot: i + 1, data });
-					// NOTE: use `then-return` to impl the `async-await` Design Patterns
-				}
-			}), Promise.resolve()))
-			.then(() => {
-				console.log("idb migration successful");
-				return true;
+		const autoSave = oldSaves.autosave;
+		if (autoSave != null) {
+			// autosave was moved from a separate slot in old system to just 0 in new
+			const save = autoSave.state;
+			// there is no need for delta-compression in indexedDB, restore real history
+			if (save.jdelta) save.history = State.jdeltaDecode(save.delta, save.jdelta);
+			else if (save.delta) save.history = State.deltaDecode(save.delta);
+			delete save.jdelta;
+			delete save.delta;
+			// no need for json-compression either
+			if (window.DoLSave) DoLSave.decompressIfNeeded({ state: save });
+			// assign V.saveId if necessary
+			const saveIdNew = genSaveId();
+			save.history.forEach(s => {
+				if (!s.variables.saveId) s.variables.saveId = saveIdNew;
 			});
+
+			const data = {
+				date: autoSave.date,
+				id: autoSave.id,
+				title: autoSave.title,
+				metadata: autoSave.metadata || { saveId: save.history.last().variables.saveId, saveName: save.history.last().variables.saveName },
+			};
+			// setItem only allows one operation at a time to prevent possible exploits, so wait for it to finish
+			await setItem(0, save, { slot: 0, data });
+		}
+		for (let i = 0; i < 8; i++) {
+			const slotSave = oldSaves.slots[i];
+			if (slotSave != null) {
+				const save = slotSave.state;
+				// same as for autosave
+				if (save.jdelta) save.history = State.jdeltaDecode(save.delta, save.jdelta);
+				else if (save.delta) save.history = State.deltaDecode(save.delta);
+				delete save.jdelta;
+				delete save.delta;
+				if (window.DoLSave) DoLSave.decompressIfNeeded({ state: save });
+				// remove known functions from old save data because indexedDB can not store them
+				save.history.forEach(s => delete s.variables.currentFurnishing);
+				const data = {
+					date: slotSave.date,
+					id: slotSave.id,
+					title: slotSave.title,
+					metadata: slotSave.metadata || { saveId: save.history.last().variables.saveId, saveName: save.history.last().variables.saveName },
+				};
+				await setItem(i + 1, save, { slot: i + 1, data });
+			}
+		}
+		console.log("idb migration successful");
+		return true;
 	}
 
 	/**
@@ -332,7 +241,8 @@ const idb = (() => {
 	 */
 	function setItem(slot, saveObj, details) {
 		if (lock) return;
-		if (saveObj == null || !Object.hasOwn(saveObj, "history")) return false;
+		// if (saveObj == null || !Object.hasOwn(saveObj, "history")) return false;
+		if (saveObj == null || !saveObj.hasOwnProperty("history")) return false;
 		lock = true;
 
 		// prepare save details
@@ -408,9 +318,6 @@ const idb = (() => {
 			Save.onLoad.handlers.forEach(fn => fn({ state: value.data }));
 			State.unmarshalForSave(value.data);
 			State.show();
-			// set V.saveId for saves without one
-			// should probably be done after State.show in case a game implements it's own ID assignment in passageHeader
-			genSaveId();
 		});
 	}
 

@@ -36,7 +36,7 @@ const Links = (() => {
 	}
 
 	function generateLinkNumbers(content) {
-		if (!Links.enabled) return;
+		if (!Links.enabled || V.options && !V.options.numberify_enabled) return;
 
 		for (let i = 0; i < disableNumberifyInVisibleElements.length; i++) {
 			if ($(content).find(disableNumberifyInVisibleElements[i]).length || $(content).is(disableNumberifyInVisibleElements[i])) return; // simply skip this render

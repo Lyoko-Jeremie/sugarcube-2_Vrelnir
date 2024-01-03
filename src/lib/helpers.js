@@ -289,7 +289,7 @@ var { // eslint-disable-line no-var
 
 		for (let i = 0, iend = ids.length; i < iend; ++i) {
 			if (Story.has(ids[i])) {
-				new Wikifier(el, Story.get(ids[i]).processText().trim(), undefined, Story.get(ids[i]));
+				el.append(Story.get(ids[i]).render());
 				return el;
 			}
 		}
@@ -308,11 +308,11 @@ var { // eslint-disable-line no-var
 	/*
 		Appends an error view to the passed DOM element.
 	*/
-	function throwError(place, message, source) {
+	function throwError(place, message, source, stack) {
 		const $wrapper = jQuery(document.createElement('div'));
 		const $toggle  = jQuery(document.createElement('button'));
 		const $source  = jQuery(document.createElement('pre'));
-		const mesg     = `${L10n.get('errorTitle')}: ${message || 'unknown error'}`;
+		const mesg     = `${L10n.get('errorTitle')}: ${message || 'unknown error'} ${Config.saves.version}`;
 
 		$toggle
 			.addClass('error-toggle')
@@ -346,6 +346,14 @@ var { // eslint-disable-line no-var
 				hidden        : 'hidden'
 			})
 			.appendTo($wrapper);
+		if (stack) {
+			const lines = stack.split('\n');
+			for (const ll of lines) {
+				const div = document.createElement('div');
+				div.append(ll.replace(/file:.*\//, '<path>/'));
+				$source.append(div);
+			}
+		}
 		$wrapper
 			.addClass('error-view')
 			.appendTo(place);

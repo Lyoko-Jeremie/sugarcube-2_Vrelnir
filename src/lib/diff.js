@@ -61,9 +61,11 @@ var Diff = (() => { // eslint-disable-line no-unused-vars, no-var
 			const bVal = b[key];
 
 			// Key exists in `a`.
-			if (Object.hasOwn(a, key)) {
+			// if (Object.hasOwn(a, key)) {
+			if (a.hasOwnProperty(key)) {
 				// Key exists in both.
-				if (Object.hasOwn(b, key)) {
+				// if (Object.hasOwn(b, key)) {
+				if (b.hasOwnProperty(key)) {
 					// Values are exactly the same, so do nothing.
 					if (aVal === bVal) {
 						continue;
