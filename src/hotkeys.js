@@ -124,6 +124,13 @@ const Links = (() => {
 				case "NumpadMultiply":
 					// reload current page
 					if (disableRNGReload) break;
+					if (Config.history.maxSessionStates < State.history.length) {
+						// make sure you won't lose the history to maxSessionStates being too low
+						const tmpMaxSessionStates = Config.history.maxSessionStates;
+						Config.history.maxSessionStates = State.history.length;
+						State.setSessionState(State.marshalForSave());
+						Config.history.maxSessionStates = tmpMaxSessionStates;
+					}
 					if (!State.restore()) break; // restores the state, returns with nothing if failed
 					if (State.prng.isEnabled()) {
 						const sessionState = State.getSessionState(); // get game state from session storage
