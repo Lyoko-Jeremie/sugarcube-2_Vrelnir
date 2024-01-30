@@ -229,7 +229,8 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 		}
 
 		outputText(destination, startPos, endPos) {
-			jQuery(destination).append(document.createTextNode(this.source.substring(startPos, endPos)));
+			// jQuery(destination).append(document.createTextNode(this.source.substring(startPos, endPos)));
+			destination.appendChild(document.createTextNode(this.source.substring(startPos, endPos)));
 		}
 
 		/*

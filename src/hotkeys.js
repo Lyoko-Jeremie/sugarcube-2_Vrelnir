@@ -10,10 +10,12 @@ const Links = (() => {
 	let numberPrepend = "(";
 	let numberAppend = ") ";
 	let enabled = true;
+	let disableNumbers = false;
 	let disableRNGReload = false;
 	let keyNumberMatcher;
 	let maxKeyDescLength;
-	const disableNumberifyInVisibleElements = ["#passage-testing-room"];
+	let skipElements = ".no-numberify, .no-numberify *"; // here, we match class "no-numberify", and then also all it's children
+	let includeElements = ".yes-numberify"; // here, we match only elements with class "yes-numberify", but not it's children
 
 	function keyNumberMatcherUpdate() {
 		keyNumberMatcher = new RegExp(RegExp.escape(numberPrepend) + "((Ctrl|Alt|Shift) \\+ )?\\d" + RegExp.escape(numberAppend));
@@ -36,14 +38,12 @@ const Links = (() => {
 	}
 
 	function generateLinkNumbers(content) {
-		if (!Links.enabled || V.options && !V.options.numberify_enabled) return;
+		if (!enabled || disableNumbers || V.options && !V.options.numberify_enabled) return;
 
-		for (let i = 0; i < disableNumberifyInVisibleElements.length; i++) {
-			if ($(content).find(disableNumberifyInVisibleElements[i]).length || $(content).is(disableNumberifyInVisibleElements[i])) return; // simply skip this render
-		}
-
-		// find all .link-internal, then remove from them all .no-numberify unless they also have .yes-numberify
-		currentLinks = $(content).find(".link-internal").not($(content).find(".no-numberify, .no-numberify *").not(".yes-numberify"));
+		// find all .link-internal, then remove from them all skipElements unless they are also in includeElements
+		if (!skipElements) currentLinks = $(content).find(".link-internal");
+		else if (!includeElements) currentLinks = $(content).find(".link-internal").not($(content).find(skipElements));
+		else currentLinks = $(content).find(".link-internal").not($(content).find(skipElements).not(includeElements));
 
 		$(currentLinks).each((i, el) => {
 			const keyNumber = numberPrepend + getPrettyKeyNumber(i + 1) + numberAppend;
@@ -60,6 +60,7 @@ const Links = (() => {
 	}
 
 	function linkFollow(index) {
+		if (disableNumbers) return;
 		if ($(currentLinks).length >= index) $(currentLinks[index - 1].click());
 	}
 
@@ -122,27 +123,17 @@ const Links = (() => {
 					else Engine.backward();
 					break;
 				case "NumpadMultiply":
-					// reload current page
-					if (disableRNGReload) break;
-					if (Config.history.maxSessionStates < State.history.length) {
-						// make sure you won't lose the history to maxSessionStates being too low
-						const tmpMaxSessionStates = Config.history.maxSessionStates;
-						Config.history.maxSessionStates = State.history.length;
-						State.setSessionState(State.marshalForSave());
-						Config.history.maxSessionStates = tmpMaxSessionStates;
+					// reload current page with different rng
+					if (disableRNGReload) break; // let game devs disable potentially cheaty option
+					State.restore(true);
+					// State.unmarshalForSave(State.marshalForSave()); // save and immediately reload current state
+					if (State.prng.isEnabled()) { // hack for predictable rng
+						State.random(); // update rng pool
+						const frame = State.history[State.activeIndex]; // active history frame
+						frame.pull = State.prng.pull; // update pull
+						frame.prng = clone(State.prng.state); // and state
 					}
-					if (!State.restore()) break; // restores the state, returns with nothing if failed
-					if (State.prng.isEnabled()) {
-						const sessionState = State.getSessionState(); // get game state from session storage
-						const frame = sessionState.history[sessionState.index]; // current history frame
-						State.random(); // re-roll rng
-						frame.prng = State.prng.state; // save new rng state
-						frame.pull++; // update pull counter
-						State.setSessionState(sessionState); // send altered session data back into storage
-						Engine.show(); // replay the passage with new rng
-						break;
-					}
-					State.show();
+					Engine.show();
 					break;
 				case "NumpadSubtract":
 					// go forward in history
@@ -156,48 +147,16 @@ const Links = (() => {
 	return Object.freeze(Object.defineProperties({}, {
 		init: { value: init },
 		generate: { value: generate },
-		currentLinks: {
-			get() {
-				return currentLinks;
-			},
-		},
-		disableNumberifyInVisibleElements: { value: disableNumberifyInVisibleElements },
 		generateLinkNumbers: { value: generateLinkNumbers },
-		pushTheButton: { value: linkFollow },
-		numberPrepend: {
-			get() {
-				return  numberPrepend;
-			},
-			set(value) {
-				numberPrepend = value;
-				keyNumberMatcherUpdate();
-			},
-		},
-		numberAppend: {
-			get() {
-				return numberAppend;
-			},
-			set(value) {
-				numberAppend = value;
-				keyNumberMatcherUpdate();
-			},
-		},
-		enabled: {
-			get() {
-				return enabled;
-			},
-			set(value) {
-				enabled = value;
-			},
-		},
-		disableRNGReload: {
-			get() {
-				return disableRNGReload;
-			},
-			set(value) {
-				disableRNGReload = value;
-			},
-		},
+		pushTheButton:       { value: linkFollow },
+		numberPrepend:       { get() { return numberPrepend;    }, set(val) { numberPrepend = val; keyNumberMatcherUpdate(); } },
+		numberAppend:        { get() { return numberAppend;     }, set(val) { numberAppend = val; keyNumberMatcherUpdate(); } },
+		skipElements:        { get() { return skipElements;     }, set(val) { skipElements = val; } },
+		includeElements:     { get() { return includeElements;  }, set(val) { includeElements = val; } },
+		enabled:             { get() { return enabled;          }, set(val) { enabled = val; } },
+		disableRNGReload:    { get() { return disableRNGReload; }, set(val) { disableRNGReload = val; } },
+		disableNumbers:      { get() { return disableNumbers;   }, set(val) { disableNumbers = val; } },
+		currentLinks:        { get() { return currentLinks;     } },
 	}));
 })();
 window.Links = Links;

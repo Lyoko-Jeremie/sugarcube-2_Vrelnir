@@ -6,7 +6,7 @@
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
-/* global Config, Diff, Engine, PRNGWrapper, Scripting, clone, session, storage */
+/* global Config, Diff, Engine, PRNGWrapper, Scripting, clone, session, storage, V */
 
 var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	'use strict';
@@ -59,13 +59,13 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Restores the story state from the active session.
 	*/
-	function stateRestore() {
+	function stateRestore(soft) {
 		if (DEBUG) { console.log('[State/stateRestore()]'); }
 
 		/*
 			Attempt to restore an active session.
 		*/
-		if (session.has('state')) {
+		if (session.has('state') && !soft) {
 			/*
 				Retrieve the session.
 			*/
@@ -84,6 +84,17 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			return true;
 		}
 
+		// perform soft reset from history
+		if (soft) {
+			const frame = _history[_activeIndex];
+			if (!frame) return false;
+			const states = Config.history.maxSessionStates;
+			Config.history.maxSessionStates = 0; // prevent writes into sessionStorage
+			momentActivate(frame);
+			Config.history.maxSessionStates = states;
+			return true;
+		}
+
 		return false;
 	}
 
@@ -98,14 +109,14 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		const radius = Math.floor(targetSize / 2); // how many frames can we cover on both sides from active frame
 
 		if (currentIndex < invertedIndex) { // active index is closer to the beginning of the array [* i * * * *]
-			if (radius >= currentIndex) startingIndex = 0 // there's enough space to include the oldest frame [(* i *) * * *]
+			if (radius >= currentIndex) startingIndex = 0; // there's enough space to include the oldest frame [(* i *) * * *]
 			else startingIndex = currentIndex - radius; // starting index will extend into the past as much as the radius can allow [* (* i *) * *]
 		}
 		else { // active index is closer to the end of the array [* * * * i *]
-			if (radius >= invertedIndex) startingIndex = currentHistoryLength - targetSize; //enough space to include the newest frame [* * * (* i *)]
+			if (radius >= invertedIndex) startingIndex = currentHistoryLength - targetSize; // enough space to include the newest frame [* * * (* i *)]
 			else startingIndex = currentIndex - radius; // [* * (* i *) *]
 		}
-		stateObj.index -= startingIndex // correct the index
+		stateObj.index -= startingIndex; // correct the index
 		stateObj.history = stateObj.history.slice(startingIndex, startingIndex + targetSize);
 
 		return stateObj;
@@ -120,7 +131,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			Gather the properties.
 		*/
 		const stateObj = {
-			index : _activeIndex,
+			index   : _activeIndex,
 			history : useClone ? clone(_history) : _history
 		};
 
@@ -284,6 +295,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			}
 			Config.history.maxSessionStates = sstates;
 			if (V.options) V.options.maxSessionStates = sstates;
+			// eslint-disable-next-line no-undef
 			if (Errors) Errors.report("Save data is too big for current History depth setting. It's value was automatically adjusted to " + sstates);
 		}
 		return pass;
