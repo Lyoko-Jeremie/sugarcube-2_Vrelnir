@@ -66,7 +66,8 @@ const Links = (() => {
 			currentLinks = currentLinks.not(baddies);
 		}
 
-		$(currentLinks).each((i, el) => {
+		for (let i = 0; i < currentLinks.length; i++) {
+			const el = currentLinks[i];
 			if (i === 40) {
 				// we don't have enough shortcuts
 				if (enabled === "debug") console.log("Links: there's too many! found", currentLinks.length, "matches, exiting after the 40th one.\n time spent: ", performance.now() - stamp)
@@ -74,11 +75,12 @@ const Links = (() => {
 			}
 			const keyNumber = numberPrepend + getPrettyKeyNumber(i + 1) + numberAppend;
 			if (keyNumberMatcher.test(el.innerHTML.slice(0, maxKeyDescLength))) {
+				// replace previously assigned number
 				el.innerHTML = el.innerHTML.replace(keyNumberMatcher, keyNumber);
 			} else {
-				$(el).html(keyNumber + $(el).html());
+				el.prepend(keyNumber);
 			}
-		});
+		}
 		if (enabled === "debug") console.log("Links: generated", currentLinks.length, "links, took", performance.now() - stamp, "ms");
 	}
 
@@ -120,6 +122,7 @@ const Links = (() => {
 
 			let offset = 0;
 			if (ev.shiftKey) offset = 10;
+			else if (ev.code.startsWith("Numpad") && ev.keyCode < 90) offset = 10; // windows must die
 			else if (ev.ctrlKey) offset = 20;
 			else if (ev.altKey) offset = 30;
 
