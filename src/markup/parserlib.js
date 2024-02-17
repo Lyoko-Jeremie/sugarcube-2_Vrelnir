@@ -1717,12 +1717,18 @@
 					if (typeof window.modSC2DataManager !== 'undefined' &&
 						typeof window.modSC2DataManager.getHtmlTagSrcHook?.()?.doHook !== 'undefined' &&
 						!!hrefLink) {
-						// need check the src is not "data:" URI
-						el.setAttribute('ML-href', hrefLink);
-						el.removeAttribute('href');
-						el.removeAttribute('xlink:href');
-						// call img loader on there
-						window.modSC2DataManager.getHtmlTagSrcHook().doHook(el, 'href').catch(Err => console.error(Err));
+						if (!el.getAttribute('href') && !el.getAttribute('xlink:href') && !el.getAttribute('ML-href')) {
+							// this case for tag without href attribute and ML-href and xlink:href attribute
+							// in this case simple ignore it
+						}
+						else {
+							// need check the src is not "data:" URI
+							el.setAttribute('ML-href', hrefLink);
+							el.removeAttribute('href');
+							el.removeAttribute('xlink:href');
+							// call img loader on there
+							window.modSC2DataManager.getHtmlTagSrcHook().doHook(el, 'href').catch(Err => console.error(Err));
+						}
 					}
 				}
 
@@ -1891,11 +1897,17 @@
 					if (typeof window.modSC2DataManager !== 'undefined' &&
 						typeof window.modSC2DataManager.getHtmlTagSrcHook?.()?.doHook !== 'undefined') {
 						if (tagName === 'img' && !el.getAttribute('src')?.startsWith('data:')) {
-							// need check the src is not "data:" URI
-							el.setAttribute('ML-src', el.getAttribute('src'));
-							el.removeAttribute('src');
-							// call img loader on there
-							window.modSC2DataManager.getHtmlTagSrcHook().doHook(el, 'src').catch(Err => console.error(Err));
+							if (!el.getAttribute('src') && !el.getAttribute('ML-src')) {
+								// this case for img tag without src attribute and without ML-src attribute
+								// in this case simple ignore it
+							}
+							else {
+								// need check the src is not "data:" URI
+								el.setAttribute('ML-src', el.getAttribute('src'));
+								el.removeAttribute('src');
+								// call img loader on there
+								window.modSC2DataManager.getHtmlTagSrcHook().doHook(el, 'src').catch(Err => console.error(Err));
+							}
 						}
 					}
 					// if (tagName.startsWith('img')) {
