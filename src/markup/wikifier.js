@@ -27,6 +27,10 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 	// eslint-disable-next-line no-undef-init
 	let _passageObjLast = undefined;
 
+	/**
+	 * @type { { passageObj: Passage , passageTitle: String }[] }
+	 * @private
+	 */
 	let _lastPassageQ = [];
 
 	/*******************************************************************************************************************
