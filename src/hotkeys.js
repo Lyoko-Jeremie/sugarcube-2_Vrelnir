@@ -10,10 +10,13 @@ const Links = (() => {
 	let numberPrepend = "(";
 	let numberAppend = ") ";
 	let enabled = true;
+	let disableNumbers = false;
 	let disableRNGReload = false;
 	let keyNumberMatcher;
 	let maxKeyDescLength;
-	const disableNumberifyInVisibleElements = ["#passage-testing-room"];
+	let throttle = false;
+	let skipElements = ".no-numberify, .no-numberify *"; // here, we match class "no-numberify", and then also all it's children
+	let includeElements = ""; // here, we can set up a matcher for exceptions that shouldn't be skipped
 
 	function keyNumberMatcherUpdate() {
 		keyNumberMatcher = new RegExp(RegExp.escape(numberPrepend) + "((Ctrl|Alt|Shift) \\+ )?\\d" + RegExp.escape(numberAppend));
@@ -35,53 +38,91 @@ const Links = (() => {
 		return str;
 	}
 
-	function generateLinkNumbers(content) {
-		if (!Links.enabled || V.options && !V.options.numberify_enabled) return;
+	function generateLinkNumbers(content, visibility) {
+		if (!enabled || disableNumbers || V.options && !V.options.numberify_enabled) return;
 
-		for (let i = 0; i < disableNumberifyInVisibleElements.length; i++) {
-			if ($(content).find(disableNumberifyInVisibleElements[i]).length || $(content).is(disableNumberifyInVisibleElements[i])) return; // simply skip this render
+		// don't run this too often. ward off the worst outcomes of bad programming that would trigger massive <<replace>> spam
+		const stamp = performance.now();
+		if (throttle + 100 > stamp) {
+			throttle = stamp;
+			generateDebounce();
+			return;
+		}
+		throttle = stamp;
+
+		// find all visible .link-internal elements, then remove from them all skipElements unless they are also in includeElements
+		if (visibility) {
+			// using :hidden pseudo-class is preferred for telling actual visibility of the link, but it's not available at the passagerender time
+			currentLinks = $(content).find(".link-internal").not(":hidden");
+		} else {
+			currentLinks = $(content).find(".link-internal").filter((i, link) => getComputedStyle(link).display !== "none");
+		}
+		if (skipElements && includeElements) {
+			const goodies = $(content).find(includeElements);
+			const baddies = $(content).find(skipElements).not(goodies);
+			currentLinks = currentLinks.not(baddies);
+		} else if (skipElements) {
+			const baddies = $(content).find(skipElements);
+			currentLinks = currentLinks.not(baddies);
 		}
 
-		// find all .link-internal, then remove from them all .no-numberify unless they also have .yes-numberify
-		currentLinks = $(content).find(".link-internal").not($(content).find(".no-numberify, .no-numberify *").not(".yes-numberify"));
-
-		$(currentLinks).each((i, el) => {
+		for (let i = 0; i < currentLinks.length; i++) {
+			const el = currentLinks[i];
+			if (i === 40) {
+				// we don't have enough shortcuts
+				if (enabled === "debug") console.log("Links: there's too many! found", currentLinks.length, "matches, exiting after the 40th one.\n time spent: ", performance.now() - stamp)
+				return;
+			}
 			const keyNumber = numberPrepend + getPrettyKeyNumber(i + 1) + numberAppend;
 			if (keyNumberMatcher.test(el.innerHTML.slice(0, maxKeyDescLength))) {
+				// replace previously assigned number
 				el.innerHTML = el.innerHTML.replace(keyNumberMatcher, keyNumber);
 			} else {
-				$(el).html(keyNumber + $(el).html());
+				el.prepend(keyNumber);
 			}
-		});
+		}
+		if (enabled === "debug") console.log("Links: generated", currentLinks.length, "links, took", performance.now() - stamp, "ms");
 	}
 
+	// this is a mostly user-triggered function that is almost guaranteed to have the passage already rendered
 	function generate() {
-		return generateLinkNumbers(document.getElementsByClassName("passage")[0] || document);
+		return generateLinkNumbers(document.getElementsByClassName("passage")[0] || document, true);
 	}
+	// and this is our bouncer that we employ to prevent unwanted spam
+	const generateDebounce = $.debounce(200, generate);
 
 	function linkFollow(index) {
+		if (disableNumbers) return;
 		if ($(currentLinks).length >= index) $(currentLinks[index - 1].click());
+	}
+
+	function inputFocused() {
+		if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName) && !["radio", "button", "checkbox", "submit", "reset", "image"].includes(document.activeElement.type)) return true;
+		return false;
 	}
 
 	function init() {
 		// collect all links and assign their numbers
 		$(document).on(":passagerender", ev => {
 			currentLinks = [];
+			throttle = 0;
 			generateLinkNumbers(ev.content);
 		});
 
 		// prevent numpad keys from triggering browser's default shortcuts
 		$(document).on("keydown", ev => {
+			if (inputFocused()) return;
 			if (ev.code.startsWith("Numpad")) ev.preventDefault();
 		});
 
 		// assign shortcuts
 		$(document).on("keyup", ev => {
-			if (!enabled || V.tempDisable || V.options && !V.options.numberify_enabled) return;
+			if (!enabled || V.tempDisable || V.options && !V.options.numberify_enabled || inputFocused()) return;
 			if (document.activeElement.tagName === "INPUT" && document.activeElement.type !== "radio" && document.activeElement.type !== "checkbox") return;
 
 			let offset = 0;
 			if (ev.shiftKey) offset = 10;
+			else if (ev.code.startsWith("Numpad") && ev.keyCode < 90) offset = 10; // windows must die
 			else if (ev.ctrlKey) offset = 20;
 			else if (ev.altKey) offset = 30;
 
@@ -122,20 +163,17 @@ const Links = (() => {
 					else Engine.backward();
 					break;
 				case "NumpadMultiply":
-					// reload current page
-					if (disableRNGReload) break;
-					if (!State.restore()) break; // restores the state, returns with nothing if failed
-					if (State.prng.isEnabled()) {
-						const sessionState = State.getSessionState(); // get game state from session storage
-						const frame = sessionState.history[sessionState.index]; // current history frame
-						State.random(); // re-roll rng
-						frame.prng = State.prng.state; // save new rng state
-						frame.pull++; // update pull counter
-						State.setSessionState(sessionState); // send altered session data back into storage
-						Engine.show(); // replay the passage with new rng
-						break;
+					// reload current page with different rng
+					if (disableRNGReload) break; // let game devs disable potentially cheaty option
+					State.restore(true);
+					// State.unmarshalForSave(State.marshalForSave()); // save and immediately reload current state
+					if (State.prng.isEnabled()) { // hack for predictable rng
+						State.random(); // update rng pool
+						const frame = State.history[State.activeIndex]; // active history frame
+						frame.pull = State.prng.pull; // update pull
+						frame.prng = clone(State.prng.state); // and state
 					}
-					State.show();
+					Engine.show();
 					break;
 				case "NumpadSubtract":
 					// go forward in history
@@ -149,48 +187,18 @@ const Links = (() => {
 	return Object.freeze(Object.defineProperties({}, {
 		init: { value: init },
 		generate: { value: generate },
-		currentLinks: {
-			get() {
-				return currentLinks;
-			},
-		},
-		disableNumberifyInVisibleElements: { value: disableNumberifyInVisibleElements },
 		generateLinkNumbers: { value: generateLinkNumbers },
-		pushTheButton: { value: linkFollow },
-		numberPrepend: {
-			get() {
-				return  numberPrepend;
-			},
-			set(value) {
-				numberPrepend = value;
-				keyNumberMatcherUpdate();
-			},
-		},
-		numberAppend: {
-			get() {
-				return numberAppend;
-			},
-			set(value) {
-				numberAppend = value;
-				keyNumberMatcherUpdate();
-			},
-		},
-		enabled: {
-			get() {
-				return enabled;
-			},
-			set(value) {
-				enabled = value;
-			},
-		},
-		disableRNGReload: {
-			get() {
-				return disableRNGReload;
-			},
-			set(value) {
-				disableRNGReload = value;
-			},
-		},
+		pushTheButton:       { value: linkFollow },
+		numberPrepend:       { get() { return numberPrepend;    }, set(val) { numberPrepend = val; keyNumberMatcherUpdate(); } },
+		numberAppend:        { get() { return numberAppend;     }, set(val) { numberAppend = val; keyNumberMatcherUpdate(); } },
+		skipElements:        { get() { return skipElements;     }, set(val) { skipElements = val; } },
+		includeElements:     { get() { return includeElements;  }, set(val) { includeElements = val; } },
+		enabled:             { get() { return enabled;          }, set(val) { enabled = val; } },
+		disableRNGReload:    { get() { return disableRNGReload; }, set(val) { disableRNGReload = val; } },
+		disableNumbers:      { get() { return disableNumbers;   }, set(val) { disableNumbers = val; } },
+		throttle:            { get() { return throttle;         }, set(val) { throttle = val; } },
+		currentLinks:        { get() { return currentLinks;     } },
+
 	}));
 })();
 window.Links = Links;

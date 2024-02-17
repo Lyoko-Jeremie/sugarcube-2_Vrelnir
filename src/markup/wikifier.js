@@ -382,7 +382,8 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 			// 	jQuery(destination).append(document.createTextNode(os));
 			// 	return;
 			// }
-			jQuery(destination).append(document.createTextNode(this.source.substring(startPos, endPos)));
+			// jQuery(destination).append(document.createTextNode(this.source.substring(startPos, endPos)));
+			destination.appendChild(document.createTextNode(this.source.substring(startPos, endPos)));
 		}
 
 		/*

@@ -1666,7 +1666,8 @@
 						if (transition) {
 							setTimeout(() => $insert.removeClass(`macro-${this.name}-in`), Engine.minDomActionDelay);
 						}
-						setTimeout(() => Links.generate(), 0);
+						// as adding and replacing content might add or change links, auto-regenerating the hotkeys might be needed
+						Links.generate();
 					}
 				))
 				.appendTo(this.output);
