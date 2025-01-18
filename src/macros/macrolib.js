@@ -3491,7 +3491,8 @@
 				unwanted by users, who are used to the current behavior from
 				similar macros and constructs.
 			*/
-			if (!Config.navigation.gotoButtons) setTimeout(() => Engine.play(passage), Engine.minDomActionDelay);
+			if (!Config.navigation.gotohell) Wikifier.stopWikify = 2; // actually, let's make it.
+			setTimeout(() => Engine.play(passage), Engine.minDomActionDelay);
 		}
 	});
 

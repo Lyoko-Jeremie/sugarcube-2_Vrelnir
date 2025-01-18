@@ -6,7 +6,7 @@
 	Use of this source code is governed by a BSD 2-clause "Simplified" License, which may be found in the LICENSE file.
 
 ***********************************************************************************************************************/
-/* global Config, Diff, Engine, PRNG, Scripting, clone, session, storage, V */
+/* global Config, Diff, Engine, PRNG, Scripting, clone, session, storage, */
 
 var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	'use strict';
@@ -29,6 +29,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	// Temporary variables object.
 	let _tempVariables = {};
 
+	let _qc = 1;
+	let _qchandlers = [];
 
 	/*******************************************************************************************************************
 		State Functions.
@@ -52,6 +54,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		_activeIndex = -1;
 		_expired     = [];
 		_prng        = _prng === null ? null : new PRNG(_prng.seed);
+		_qc          = true;
 	}
 
 	/*
@@ -112,6 +115,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			else startingIndex = currentIndex - radius; // [* * (* i *) *]
 		}
 		stateObj.index -= startingIndex; // correct the index
+		stateObj.history.slice(0, startingIndex).forEach(m => stateObj.expired.push(m.title)); // expire removed history
 		stateObj.history = stateObj.history.slice(startingIndex, startingIndex + targetSize);
 
 		return stateObj;
@@ -120,7 +124,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Returns the current story state marshaled into a serializable object.
 	*/
-	function stateMarshal(noDelta = true, depth = Config.history.maxSessionStates, useClone = false) {
+	function stateMarshal(noDelta = false, depth = Config.history.maxSessionStates, useClone = false) {
 		if (depth === 0) return null; // don't bother
 		/*
 			Gather the properties.
@@ -145,34 +149,24 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Restores the story state from a marshaled story state serialization object.
 	*/
-	function stateUnmarshal(stateObj, noDeltaFlag = true) {
-		let noDelta = noDeltaFlag;
-		if (stateObj == null) { // lazy equality for null
-			throw new Error('state object is null or undefined');
-		}
+	function stateUnmarshal(stateObj, type) {
+		if (stateObj == null) throw new Error('state object is null or undefined');
 
-		if (!stateObj.hasOwnProperty(noDelta ? 'history' : 'delta') || stateObj[noDelta ? 'history' : 'delta'].length === 0) {
-			if (stateObj.hasOwnProperty('delta')) {
-				noDelta = false;
-			}
-			else if (stateObj.hasOwnProperty('history')) {
-				noDelta = true;
-			}
-			else {
-				throw new Error('state object has no history or history is empty');
-			}
-		}
-
-		if (!stateObj.hasOwnProperty('index')) {
-			throw new Error('state object has no index');
-		}
+		const hasDelta = Object.hasOwn(stateObj, 'delta');
+		const hasHistory = Object.hasOwn(stateObj, 'history');
+		if (hasDelta && hasHistory) throw new Error('state object has both compressed and uncompressed history');
+		if (hasDelta && stateObj.delta.length === 0 || hasHistory && stateObj.history.length === 0 || !hasDelta && !hasHistory) throw new Error('state object has no history or history is empty');
+		if (!stateObj.hasOwnProperty('index')) throw new Error('state object has no index');
 
 		/*
 			Restore the properties.
 		*/
-		_history     = noDelta ? clone(stateObj.history) : historyDeltaDecode(stateObj.delta);
+		_history     = hasHistory ? clone(stateObj.history) : historyDeltaDecode(stateObj.delta);
 		_activeIndex = stateObj.index;
 		_expired     = stateObj.hasOwnProperty('expired') ? [...stateObj.expired] : [];
+		_qc          = stateObj.idx;
+		// eslint-disable-next-line
+		if (_qc != 1) { _qc = 1; if (_qchandlers.length === 0 || !_qchandlers.every(h => h(_history))) _qc += ''; }
 
 		if (stateObj.hasOwnProperty('seed') && _prng !== null) {
 			/*
@@ -198,8 +192,8 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	/*
 		Restores the story state from a marshaled save-compatible story state serialization object.
 	*/
-	function stateUnmarshalForSave(stateObj) {
-		return stateUnmarshal(stateObj, true);
+	function stateUnmarshalForSave(stateObj, type) {
+		return stateUnmarshal(stateObj, type);
 	}
 
 	/*
@@ -394,7 +388,9 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		let depth = Math.min(Config.history.maxSessionStates, State.history.length);
 		while (depth > 0 && !pass) {
 			try {
-				session.set('state', stateMarshal(false, depth));
+				const state = stateMarshal(false, depth);
+				state.idx = State.qc;
+				session.set('state', state);
 				pass = true;
 			}
 			catch { // depth is too high to fit sessionStorage
@@ -825,6 +821,11 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		T : { get() { return _tempVariables; }, configurable : true }
 	});
 
+	function prngPullSet(pull) {
+		if (!_prng) return;
+		if (Number.isInteger(pull)) return _prng.pull = pull;
+		throw new Error(`pullSet: invalid parameter: ${pull}`);
+	}
 	/*******************************************************************************************************************
 		Module Exports.
 	*******************************************************************************************************************/
@@ -877,7 +878,7 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 			value : Object.freeze(Object.defineProperties({}, {
 				init      : { value : prngInit },
 				isEnabled : { value : prngIsEnabled },
-				pull      : { get : prngPull },
+				pull      : { get : prngPull, set(val) { prngPullSet(val); } },
 				seed      : { get : prngSeed },
 				str2int   : { value : prngStr2Int },
 				test      : { value : prngTest },
@@ -913,6 +914,12 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 				size    : { get : metadataSize }
 			}))
 		},
+
+		/*
+			qc stuff
+		*/
+		qc    : { get() { return _qc;  } },
+		qcadd : { value(fn) { if (typeof fn === 'function') _qchandlers.push(fn); } },
 
 		/*
 			Legacy Aliases.

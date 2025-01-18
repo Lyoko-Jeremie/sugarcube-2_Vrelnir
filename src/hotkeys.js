@@ -88,6 +88,7 @@ const Links = (() => {
 	function generate() {
 		return generateLinkNumbers(document.getElementsByClassName("passage")[0] || document, true);
 	}
+
 	// and this is our bouncer that we employ to prevent unwanted spam
 	const generateDebounce = $.debounce(200, generate);
 
@@ -118,7 +119,7 @@ const Links = (() => {
 		// assign shortcuts
 		$(document).on("keyup", ev => {
 			if (!enabled || V.tempDisable || V.options && !V.options.numberify_enabled || inputFocused()) return;
-			if (document.activeElement.tagName === "INPUT" && document.activeElement.type !== "radio" && document.activeElement.type !== "checkbox") return;
+			if (Dialog.isOpen()) return ev.code === "Escape" ? Dialog.close() : false;
 
 			let offset = 0;
 			if (ev.shiftKey) offset = 10;

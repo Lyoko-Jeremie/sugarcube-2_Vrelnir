@@ -402,6 +402,12 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 	function engineGo(offset) {
 		const succeded = State.go(offset);
 
+		jQuery.event.trigger({
+			type : ':enginego',
+			offset,
+			succeded
+		});
+
 		if (succeded) {
 			engineShow();
 		}

@@ -125,7 +125,7 @@ class PRNG {
 	}
 
 	toShuffled(array) {
-		return shuffle(array, false);
+		return this.shuffle(array, false);
 	}
 
 	/*
@@ -174,6 +174,7 @@ class PRNG {
 	 * test function to check the random distribution
 	 * @param {number} count how many times to roll
 	 * @param {number} granularity how many baskets to fill
+	 * @param {boolean} advancerng increase the actual prng pull value
 	 * @returns {Array} how many times each basket was hit
 	 */
 	test(count = 10, granularity = 10, advancerng) {

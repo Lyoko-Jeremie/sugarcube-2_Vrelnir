@@ -37,7 +37,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 	********************************/
 	let useSplit = () => Story.domId === 'free-cities'; // todo: make it a proper toggle
 	function indexGet() {
-		return storage.get('index');
+		return storage.get('index') ?? savesObjCreate();
 	}
 
 	function splitSave(slot, data) {
@@ -169,6 +169,12 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 	}
 
 	function autosaveLoad() {
+		// idb intercept
+		if (idb.active) {
+			idb.loadState(0);
+			return true;
+		}
+
 		const saves = useSplit() ? { autosave : storage.get('autosave') } : savesObjGet();
 
 		if (saves.autosave === null) {
@@ -183,13 +189,11 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			return false;
 		}
 
-		// idb intercept, don't care about no titles or metadata
-		// don't know of a game where it would be relevant
+		// idb intercept
 		if (idb.active) {
-			idb.saveState(0);
+			idb.saveState(0, title, metadata);
 			return true;
 		}
-
 
 		const saves        = savesObjGet();
 		const supplemental = {
@@ -428,6 +432,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		}
 
 		const supplemental = metadata == null ? {} : { metadata }; // lazy equality for null
+		supplemental.idx = State.qc;
 		const data = LZString.compressToBase64(JSON.stringify(_marshal(supplemental, { type : Type.Serialize })));
 		return data + LZString.compressToBase64(JSON.stringify({ [Story.domId] : data.length }));
 	}
@@ -446,10 +451,11 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 			const metadata = JSON.parse(LZString.decompressFromBase64(base64Str.slice(offset)));
 			_meta = metadata;
 			saveObj = JSON.parse(jsonstring);
+			if (_meta?.[Story.domId] !== offset) saveObj.idx += '';
 		}
 		catch (ex) { /* no-op; `_unmarshal()` will handle the error */ }
 
-		if (!_unmarshal(saveObj)) {
+		if (!_unmarshal(saveObj, 'file')) {
 			return null;
 		}
 
@@ -550,7 +556,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		const saveObj = Object.assign({}, supplemental, {
 			id    : Config.saves.id,
 			state : State.marshalForSave(),
-			idx   : supplemental?.idx || 1
+			idx   : State.qc
 		});
 
 		if (Config.saves.version) {
@@ -604,9 +610,8 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 
 			_onLoadHandlers.forEach(fn => fn(saveObj));
 
-			if (saveObj.id !== Config.saves.id) {
-				throw new Error(L10n.get('errorSaveIdMismatch'));
-			}
+			if (saveObj.id !== Config.saves.id) throw new Error(L10n.get('errorSaveIdMismatch'));
+			saveObj.state.idx = saveObj.idx || '';
 
 			// Restore the state.
 			State.unmarshalForSave(saveObj.state); // may also throw exceptions

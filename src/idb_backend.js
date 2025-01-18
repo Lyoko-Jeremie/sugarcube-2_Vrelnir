@@ -12,6 +12,8 @@
  * generally though, just adding a "saveList" id or class to the div element where the saves should appear and replacing the function/macro that populates that div with "if (idb.active) idb.saveList(); else old-custom-way-of-building-save-menu" should be enough to make it work.
  */
 
+/* global State, Story, Save, clone */
+
 const idb = (() => {
 	"use strict";
 
@@ -27,72 +29,71 @@ const idb = (() => {
 		/* eslint-enable brace-style */
 	});
 
-	let lock = true; // don't allow multiple operations at the same time, majority of sugarcube is not async
-	let active = true; // whether to use indexedDB or the old localStorage
-	let dbName = "idb"; // database name
-	let migrationNeeded = false; // flag to migrate old saves
-	let open = false; // some browsers randomly decide to close db still in use
-	let settings = {}; // persistent db settings stored in localStorage
+	let _lock = true; // don't allow multiple operations at the same time, majority of sugarcube is not async
+	let _active = true; // whether to use indexedDB or the old localStorage
+	let _dbName = "idb"; // database name
+	let _migrationNeeded = false; // flag to migrate old saves
+	let _settings = {}; // persistent db settings stored in localStorage
 	updateSettings();
-	let saveDetails = []; // cache so we don't have to query all items from details store on every page change
+	let _saveDetails = []; // cache so we don't have to query all items from details store on every page change
 
-	let db; // database to be
+	function log(description, data, useClone) {
+		console.log(description, useClone ? clone(data) : data);
+		if (window.Errors) Errors.report(description, data, useClone);
+		else alert(`${description}\n${JSON.stringify(data)}`);
+	}
 
-	let openRequest = null;
-	// open the database. should stay open while the page is open.
-	function openDB(name = dbName) {
+	// bring the database up to date
+	const _version = 1;
+	function dbUpgrade(ev) {
+		const db = ev.target.result;
+		const ver = ev.oldVersion;
+		console.log("updating idb", ver);
+		switch (ver) {
+			case 0:
+				// first time opening, create stores for fat saves and slim details
+				db.createObjectStore("saves", { keyPath: "slot" });
+				db.createObjectStore("details", { keyPath: "slot" });
+				_migrationNeeded = true; // flag localStorage saves for migration
+				break;
+			case 1:
+				// reserved for upgrading from ver 1 in the future
+		}
+	}
+
+	// open the database
+	function openDB(name = _dbName, version = _version) {
 		return new Promise((resolve, reject) => {
-			dbName = name;
-			openRequest = indexedDB.open(idb.dbName);
-			// bring the database up to date
-			openRequest.onupgradeneeded = event => {
-				console.log("updating idb", event.oldVersion);
-				switch (event.oldVersion) {
-					case 0: // 0 means we're creating a new database from scratch
-						// create an object store for saves, containing lots of data
-						openRequest.result.createObjectStore("saves", { keyPath: "slot" });
-						// and a separate store for small details, that should be fast to access
-						openRequest.result.createObjectStore("details", { keyPath: "slot" });
-						// flag old saves from localStorage for migration
-						migrationNeeded = true;
-					case 1:
-						break; // put db upgrade code here if it's ever needed
-				}
-			};
-			// errors most often happen in private browsing mode. nothing to do here.
-			openRequest.onerror = () => {
-				console.log("error opening idb", openRequest.error);
-				reject(openRequest.error);
+			_dbName = name;
+			const openRequest = indexedDB.open(idb.dbName, version);
+			openRequest.onupgradeneeded = dbUpgrade;
+			openRequest.onerror = ev => {
+				const err = ev.target.error;
+				log("error opening idb", err);
+				reject(err);
 			};
 			// indexedDB is opened, mark the rest of the system as active
-			openRequest.onsuccess = () => {
-				db = openRequest.result;
-				lock = false;
-				open = true;
-				getSaveDetails().then(d => saveDetails = d);
-				console.log("idbOpen success");
+			openRequest.onsuccess = ev => {
+				_lock = false;
 				if (navigator.storage && typeof navigator.storage.persist === "function") navigator.storage.persist();
+				const db = ev.target;
 				db.onclose = ev => {
-					open = false;
-					active = false;
-					console.log("idb connection closed, this shouldn't happen", ev);
-					if (Errors) Errors.report("ERROR: idb connection closed unexpectedly", ev);
-					else alert("ERROR: idb connection closed unexpectedly");
+					_active = false;
+					log("ERROR: idb connection closed unexpectedly", ev);
 				};
 				db.onerror = ev => {
-					console.error(`Database error: ${ev.target.errorCode}`);
-					active = false;
+					_active = false;
+					log("Database error", ev.target.errorCode);
 				};
-				// this only triggers after initial db creation, but can't be put into onupgradeneeded because you need database to be successfully open before putting stuff into it
-				if (migrationNeeded) {
+				if (_migrationNeeded) {
 					importFromLocalStorage();
-					migrationNeeded = false;
+					_migrationNeeded = false;
 				}
-				resolve(db);
+				resolve(db.result);
 			};
 			openRequest.onblocked = () => {
 				console.log("something went wrong", openRequest.error);
-				reject(openRequest.error);
+				// reject(openRequest.error);
 			};
 		});
 	}
@@ -106,16 +107,20 @@ const idb = (() => {
 	 */
 	function updateSettings(setting, value) {
 		const storageName = "idb-settings";
-		settings = JSON.parse(localStorage.getItem(storageName)) || {
+		_settings = JSON.parse(localStorage.getItem(storageName)) || {
 			warnSave: V.confirmSave || false,
 			warnLoad: V.confirmLoad || false,
 			warnDelete: V.confirmDelete || true,
 			active: !window.FCHostPersistent,
-			useDelta: false,
+			useDelta: true,
 		};
-		if (setting) settings[setting] = value;
-		active = settings.active; // one-way sync, only change default when triggered by user, not by fail-safes
-		localStorage.setItem(storageName, JSON.stringify(settings));
+		_active = _settings.active; // one-way sync, only change default when triggered by user, not by fail-safes
+		if (!setting) return;
+		if (!['warnSave', 'warnLoad', 'warnDelete', 'active', 'useDelta'].includes(setting)) return console.warn(`idbupdatesettings: invalid argument: ${setting}`);
+		if (value == null) return _settings[setting];
+		_settings[setting] = value;
+		_active = _settings.active; // do it again
+		localStorage.setItem(storageName, JSON.stringify(_settings));
 	}
 	updateSettings();
 
@@ -186,8 +191,8 @@ const idb = (() => {
 	 * @returns {boolean} success of the operation
 	 */
 	async function importFromLocalStorage() {
-		function processSave(saveObj) {
-			const save = saveObj.state;
+		function processSave(fullSaveObj) {
+			const save = fullSaveObj.state;
 			if (save.jdelta) delete save.jdelta; // jdelta wasn't a great idea
 			if (save.delta) save.history = State.deltaDecode(save.delta);
 			delete save.delta;
@@ -200,14 +205,15 @@ const idb = (() => {
 				save.history.forEach(s => s.variables.saveId = saveId);
 			}
 
-			const data = {
-				date: saveObj.date,
-				id: saveObj.id,
-				title: saveObj.title,
-				metadata: saveObj.metadata || { saveId: vars.saveId, saveName: vars.saveName },
+			const details = {
+				date: fullSaveObj.date,
+				id: fullSaveObj.id,
+				idx: fullSaveObj.idx,
+				title: fullSaveObj.title,
+				metadata: fullSaveObj.metadata || { saveId: vars.saveId, saveName: vars.saveName },
 			};
 
-			return [save, data];
+			return [save, details];
 		}
 
 		let mtCount = 0;
@@ -244,7 +250,7 @@ const idb = (() => {
 				}
 			}
 		}
-		await getSaveDetails().then(d => saveDetails = d);
+		await getSaveDetails().then(d => _saveDetails = d);
 		console.log("idb migration successful");
 		return true;
 	}
@@ -257,21 +263,21 @@ const idb = (() => {
 	function makePromise(transaction) {
 		return new Promise((resolve, reject) => {
 			transaction.onsuccess = () => {
-				lock = false;
+				_lock = false;
 				return resolve(transaction.result);
 			};
 			transaction.oncomplete = () => {
-				lock = false;
+				_lock = false;
 				return resolve(transaction.result);
 			};
 			transaction.onerror = ev => {
-				lock = false;
-				active = false;
+				_lock = false;
+				_active = false;
 				console.log(transaction.error, ev, "error");
 				return reject(transaction.error);
 			};
 			transaction.onabort = () => {
-				lock = false;
+				_lock = false;
 				console.log("aborted", transaction.error);
 				return reject(transaction.error);
 			};
@@ -285,11 +291,12 @@ const idb = (() => {
 	 * @returns {Promise} promise to return a value some day
 	 */
 	async function getItem(slot) {
-		if (!open) await openDB();
+		const db = await openDB();
 		const transactionRequest = db.transaction("saves", "readonly");
 		const item = transactionRequest.objectStore("saves").get(slot);
-
-		return makePromise(item);
+		const result = await makePromise(item).catch(err => log(`couldn't retrieve idb item in slot ${slot}`, err));
+		db.close();
+		return result;
 	}
 
 	/**
@@ -302,29 +309,33 @@ const idb = (() => {
 	 * @returns {Promise | undefined} promise to report on success of this operation some day or return early
 	 */
 	async function setItem(slot, saveObj, details) {
-		if (lock) return;
-		// if (saveObj == null || !Object.hasOwn(saveObj, "history")) return false;
-		if (saveObj == null || !saveObj.hasOwnProperty("history")) return false;
-		lock = true;
+		if (_lock) return;
+		if (saveObj == null || !Object.hasOwn(saveObj, "history")) return false;
+		_lock = true;
 
 		// prepare save details
 		const savesItem = { slot, data: saveObj };
 		const saveVars = saveObj.history[saveObj.index].variables;
-		const metadata = { saveId: saveVars.saveId, saveName: saveVars.saveName };
-		const detailsItem = details || {
-			slot,
-			data: {
-				id: Story.domId,
-				title: Story.get(State.passage).description(),
-				date: Date.now(),
-				metadata,
-			},
-		};
-		detailsItem.slot = slot; // ensure that slot is in the details
+		const metadata = Object.assign({ saveId: saveVars.saveId, saveName: saveVars.saveName }, details?.metadata);
+		details.metadata = metadata;
+		const detailsItem = details
+			? {
+				slot,
+				data: details,
+			}
+			: {
+				slot,
+				data: {
+					id: Story.domId,
+					idx: State.qc,
+					title: Story.get(State.passage).description(),
+					date: Date.now(),
+					metadata,
+				},
+			};
 
 		// expect failures here
 		try {
-			if (!open) await openDB();
 			// sanitize complex data structures that can't be stored in idb
 			let counter = 0; // only report problems for the first frame
 			saveObj.history.forEach(s => {
@@ -332,24 +343,28 @@ const idb = (() => {
 				funNuke(s.variables, "", !counter++); // wrap up new baddies
 				if (baddies.length) s.baddies = clone(baddies); // seal the records
 			});
-			if (settings.useDelta) {
+			if (_settings.useDelta && slot !== 0) {
+				// compress the history, some games are really space-hungry
+				// autosaves are exempt because performance reasons
 				saveObj.delta = State.deltaEncode(saveObj.history);
 				delete saveObj.history;
 			}
 
-			// open a request to set or replace an existing slot
+			const db = await openDB();
+
 			const transactionRequest = db.transaction(["saves", "details"], "readwrite");
 			transactionRequest.objectStore("saves").delete(slot);
 			transactionRequest.objectStore("saves").add(savesItem);
 			transactionRequest.objectStore("details").delete(slot);
 			transactionRequest.objectStore("details").add(detailsItem);
 
-			return makePromise(transactionRequest);
+			const result = await makePromise(transactionRequest).catch(err => log(`couldn't put idb item in slot ${slot}`, err));
+			db.close();
+			return result;
 		} catch (ex) {
 			// admit the defeat and go home
-			if (window.Errors) Errors.report(`idb.setItem failure unknown. Couldn't complete the save in slot ${slot}`);
-			else alert(`idb.setItem failure unknown. Couldn't complete the save in slot ${slot}`);
-			lock = false;
+			log(`idb.setItem failure unknown. Couldn't complete the save in slot ${slot}`);
+			_lock = false;
 			// return a promise, because some code down the line expects .then()
 			return new Promise(resolve => resolve(false));
 		}
@@ -362,15 +377,17 @@ const idb = (() => {
 	 * @returns {Promise | undefined} promise to report on success or return early
 	 */
 	async function deleteItem(slot) {
-		if (lock) return;
-		if (!open) await openDB();
-		lock = true;
+		if (_lock) return;
+		const db = await openDB();
 
+		_lock = true;
 		const transactionRequest = db.transaction(["saves", "details"], "readwrite");
 		transactionRequest.objectStore("saves").delete(slot);
 		transactionRequest.objectStore("details").delete(slot);
-
-		return makePromise(transactionRequest).then(await getSaveDetails().then(d => saveDetails = d));
+		const result = await makePromise(transactionRequest);
+		db.close();
+		await getSaveDetails();
+		return result;
 	}
 
 	/**
@@ -378,63 +395,91 @@ const idb = (() => {
 	 *
 	 * @param {number} slot
 	 */
-	function loadState(slot) {
-		if (lock) return;
-		return getItem(slot).then(value => {
-			if (value == null) return false;
-			if (value.data.delta) {
-				value.data.history = State.deltaDecode(value.data.delta);
-				delete value.data.delta;
+	async function loadState(slot) {
+		if (_lock) return;
+		const data = await getItem(slot);
+		if (data == null) return false;
+		const state = data.data;
+		// restore history
+		if (state.delta) {
+			state.history = State.deltaDecode(state.delta);
+			delete state.delta;
+		}
+		// restore complex structures
+		state.history.forEach(s => {
+			if (s.baddies) {
+				ekuNnuf(s.variables, s.baddies);
+				delete s.baddies;
 			}
-			value.data.history.forEach(s => {
-				// restore story var functions
-				if (s.baddies) {
-					ekuNnuf(s.variables, s.baddies);
-					delete s.baddies;
-				}
-			});
-			Save.onLoad.handlers.forEach(fn => fn({ state: value.data }));
-			State.unmarshalForSave(value.data);
-			State.show();
 		});
+		// reconstruct fullSaveObj expected by onLoad
+		const details = _saveDetails.find(d => d.slot === slot)?.data;
+		state.idx = details.idx;
+		const fullSaveObj = Object.assign({ state }, details);
+		Save.onLoad.handlers.forEach(fn => fn(fullSaveObj));
+		State.unmarshalForSave(state);
+		State.show();
 	}
 
 	/**
 	 * save current game into idb
 	 *
 	 * @param {number} slot
+	 * @param {string} title
+	 * @param {object} metadata
 	 */
-	async function saveState(slot) {
-		if (lock) return;
-		const saveObj = State.marshalForSave();
+	async function saveState(slot, title, metadata) {
+		if (_lock) return;
+
 		// assign V.saveId if necessary
 		if (!V.saveId) {
 			const saveId = Math.floor(Math.random() * 90000) + 10000;
 			V.saveId = saveId;
 			State.history.forEach(s => s.variables.saveId = saveId);
-			saveObj.history.forEach(s => s.variables.saveId = saveId);
 		}
-		Save.onSave.handlers.forEach(fn => fn({ state: saveObj, date: Date.now() }, { type: slot <= 0 ? "autosave" : "slot" })); // run onSave handlers
+
+		// saveObj goes into saves db, the rest goes into details db
+		const saveObj = State.marshalForSave();
+		// we combine state and details into a single big object because that's what onSave expects
+		const fullSaveObj = {
+			state: saveObj,
+			date: Date.now(),
+			id: Story.domId,
+			idx: State.qc,
+			title: title || Story.get(State.passage).description(),
+		};
+		if (metadata != null) fullSaveObj.metadata = metadata;
+
+		// run onSave handlers
+		Save.onSave.handlers.forEach(fn => fn(fullSaveObj, { type: slot <= 0 ? "autosave" : "slot" }));
+
+		// weird as object pointers are in js, it is now safe to remove .state from fullSaveObj, leaving only save details. so, let's rename it to reflect that
+		const details = fullSaveObj;
+		delete details.state;
+
+		// finally, send everything to idb and synchronize _saveDetails
 		if (saveObj != null) {
-			await setItem(slot, saveObj);
-			await getSaveDetails().then(d => saveDetails = d);
+			await setItem(slot, saveObj, details);
+			await getSaveDetails();
 			return true;
 		}
 		return false;
 	}
 
 	/**
-	 * get all elements from details db
-	 * details db mirrors metadata for real saves in saves db
+	 * retrieve details for all saves from idb and also cache them to _saveDetails for fast retrieval
 	 *
-	 * @returns {Array} list of details for all saves in idb
+	 * @returns {Promise<array>} list of details for all saves in idb
 	 */
 	async function getSaveDetails() {
-		if (!open) await openDB();
+		const db = await openDB();
+		// const db = request.result;
 		const transactionRequest = db.transaction(["details"], "readonly");
-		const details = transactionRequest.objectStore("details").getAll();
-
-		return makePromise(details);
+		const details = await makePromise(transactionRequest.objectStore("details").getAll());
+		db.close();
+		// warning: async quirks
+		_saveDetails = details; // here, details is an array
+		return details; // but the function returns a promise resolved to that array, not the array itself
 	}
 
 	/**
@@ -444,11 +489,13 @@ const idb = (() => {
 	 * @returns {Array} list of data for all saves in idb
 	 */
 	async function getAllSaves() {
-		if (!open) await openDB();
+		const db = await openDB();
 		const transactionRequest = db.transaction(["saves"], "readonly");
-		const details = transactionRequest.objectStore("saves").getAll();
+		const saves = transactionRequest.objectStore("saves").getAll();
+		const result = await makePromise(saves)
+		db.close();
 
-		return makePromise(details);
+		return result;
 	}
 
 	/**
@@ -457,12 +504,12 @@ const idb = (() => {
 	 * @returns {Promise | undefined} promise to maybe report when the deed is done or return early
 	 */
 	async function clearAll() {
-		if (lock) return;
-		if (!open) await openDB();
+		if (_lock) return;
+		const db = await openDB();
 		const transactionRequest = db.transaction(["saves", "details"], "readwrite");
 		transactionRequest.objectStore("saves").clear();
 		transactionRequest.objectStore("details").clear();
-		saveDetails = [];
+		_saveDetails = [];
 
 		return makePromise(transactionRequest);
 	}
@@ -503,7 +550,7 @@ const idb = (() => {
 		// find the most recent save that is not autosave
 		latestSave = { slot: 1, date: 0 }; // re-init latest slot every time
 		let autoSaveDate; // store timestamp for the autosave separately
-		saveDetails.forEach(d => {
+		_saveDetails.forEach(d => {
 			if (d.slot === 0) autoSaveDate = d.data.date;
 			else if (d.data.date > latestSave.date) {
 				latestSave.slot = d.slot;
@@ -513,7 +560,7 @@ const idb = (() => {
 		// default list length is set here
 		if (!listLength) {
 			// idb is indexed by slot, so the highest is always last
-			const slot = saveDetails.length ? saveDetails.last().slot : 0;
+			const slot = _saveDetails.length ? _saveDetails.last().slot : 0;
 			// adjust list length to include saves in the highest slot
 			// max pages is 20 (still too low if you're using 1080x1920 portrait mode)
 			// by default, list length is 10, resulting into up to 200 slots across 20 pages
@@ -526,10 +573,10 @@ const idb = (() => {
 		// if not set to a correct value, show the page with the most recent save
 		if (!Number.isInteger(page)) {
 			// autosave is shown on every page, so if autosave is the most recent save - open the page with the most recent non-autosave with the same ID
-			const latestSlot = saveDetails.find(d => d.slot === latestSave.slot);
+			const latestSlot = _saveDetails.find(d => d.slot === latestSave.slot);
 			if (latestSlot) {
-				const autoSaveExists = saveDetails[0].slot === 0;
-				const ignoreAutoSave = latestSlot.data.date > autoSaveDate || latestSlot.data.metadata.saveId === saveDetails[0].data.metadata.saveId;
+				const autoSaveExists = Boolean(_saveDetails.find(d => d.slot === 0));
+				const ignoreAutoSave = latestSlot.data.date > autoSaveDate || latestSlot.data.metadata.saveId === _saveDetails[0].data.metadata.saveId;
 				if (!autoSaveExists || ignoreAutoSave) page = Math.floor((latestSave.slot - 1) / length);
 				else page = 0;
 			} else page = 0;
@@ -546,7 +593,7 @@ const idb = (() => {
 		const defaultDetailsObj = { date: "", title: "", metadata: { saveId: "", saveName: "" } };
 
 		// always show autosave on top
-		const autoDetailsObj = saveDetails[0] && saveDetails[0].slot === 0 ? saveDetails[0].data : clone(defaultDetailsObj);
+		const autoDetailsObj = _saveDetails.find(d => d.slot === 0)?.data ?? clone(defaultDetailsObj);
 		if (autoSaveDate > latestSave.date) autoDetailsObj.latestSlot = true;
 		autoDetailsObj.slot = 0;
 		// don't show if autosaves are disabled by the engine
@@ -557,9 +604,9 @@ const idb = (() => {
 			// create default details
 			let detailsObj = clone(defaultDetailsObj);
 			// if a save exists in idb, replace the details with recorded ones
-			const detailsIndex = saveDetails.findIndex(d => d.slot === slot);
+			const detailsIndex = _saveDetails.findIndex(d => d.slot === slot);
 			if (detailsIndex !== -1) {
-				detailsObj = saveDetails[detailsIndex].data;
+				detailsObj = _saveDetails[detailsIndex].data;
 				// add a flag to highlight the most recent save
 				if (Number(latestSave.slot) === slot) detailsObj.latestSlot = true;
 			}
@@ -664,7 +711,7 @@ const idb = (() => {
 		importButton.onclick = () => {
 			jQuery(document.createElement("input")).prop("type", "file").on("change", SugarCube.Save.import).trigger("click"); // gotta give it to anthaum for finding this
 			window.closeOverlay();
-		}
+		};
 		li = document.createElement("li");
 		li.appendChild(importButton);
 		container.appendChild(li);
@@ -684,7 +731,7 @@ const idb = (() => {
 	/**
 	 * optional extra footer row
 	 */
-	function generateExtraFooterRow () {
+	function generateExtraFooterRow() {
 		if (!footerHTML) return null;
 		const container = document.createElement("ul");
 		container.className = "buttons";
@@ -905,11 +952,10 @@ const idb = (() => {
 	 * @param {object} details save details for confirmations
 	 */
 	async function saveList(mode, details) {
-		if (!open) await openDB();
-		if (active && !settings.active) updateSettings("active", true); // for when it's called from old save menu
+		if (_active && !_settings.active) updateSettings("active", true); // for when it's called from old save menu
 		if (!mode) {
 			// update saveDetails every time menu opens with no options, in case game was saved in another tab
-			await getSaveDetails().then(d => saveDetails = d);
+			await getSaveDetails();
 			mode = "show saves";
 		}
 
@@ -992,7 +1038,7 @@ const idb = (() => {
 				reqSaveLabel.innerText = L10n.get("savesOptionsOverwrite");
 				const reqSave = document.createElement("input");
 				reqSave.type = "checkbox";
-				reqSave.checked = settings.warnSave;
+				reqSave.checked = _settings.warnSave;
 				reqSave.onchange = () => updateSettings("warnSave", reqSave.checked);
 				reqSaveLabel.appendChild(reqSave);
 				li = document.createElement("li");
@@ -1003,7 +1049,7 @@ const idb = (() => {
 				reqLoadLabel.innerText = L10n.get("savesLabelLoad");
 				const reqLoad = document.createElement("input");
 				reqLoad.type = "checkbox";
-				reqLoad.checked = settings.warnLoad;
+				reqLoad.checked = _settings.warnLoad;
 				reqLoad.onchange = () => updateSettings("warnLoad", reqLoad.checked);
 				reqLoadLabel.appendChild(reqLoad);
 				li = document.createElement("li");
@@ -1014,7 +1060,7 @@ const idb = (() => {
 				reqDeleteLabel.innerText = L10n.get("savesLabelDelete");
 				const reqDelete = document.createElement("input");
 				reqDelete.type = "checkbox";
-				reqDelete.checked = settings.warnDelete;
+				reqDelete.checked = _settings.warnDelete;
 				reqDelete.onchange = () => updateSettings("warnDelete", reqDelete.checked);
 				reqDeleteLabel.appendChild(reqDelete);
 				li = document.createElement("li");
@@ -1059,7 +1105,7 @@ const idb = (() => {
 			}
 			case "confirm save": {
 				// skip confirmation if the slot is empty, but do not skip on saveId mismatch, even if confirmation is not required
-				if (!details.date || !settings.warnSave && details.metadata.saveId === V.saveId) return saveState(details.slot).then(window.closeOverlay());
+				if (!details.date || !_settings.warnSave && details.metadata.saveId === V.saveId) return saveState(details.slot).then(window.closeOverlay());
 				const confirmSaveWarning = document.createElement("div");
 				confirmSaveWarning.className = "saveBorder";
 
@@ -1094,7 +1140,7 @@ const idb = (() => {
 			}
 			case "confirm delete": {
 				// skip confirmation if corresponding toggle is off
-				if (!settings.warnDelete) return deleteItem(details.slot).then(() => saveList("show saves"));
+				if (!_settings.warnDelete) return deleteItem(details.slot).then(() => saveList("show saves"));
 				const confirmDeleteWarning = document.createElement("div");
 				confirmDeleteWarning.className = "saveBorder";
 				const confirmDeleteWarningTitle = document.createElement("h3");
@@ -1123,7 +1169,7 @@ const idb = (() => {
 			}
 			case "confirm load": {
 				// skip confirmation if corresponding toggle is off
-				if (!settings.warnLoad) return loadState(details.slot).then(() => window.closeOverlay());
+				if (!_settings.warnLoad) return loadState(details.slot).then(() => window.closeOverlay());
 				const confirmLoad = document.createElement("div");
 				confirmLoad.className = "saveBorder";
 				const confirmLoadTitle = document.createElement("h3");
@@ -1179,69 +1225,29 @@ const idb = (() => {
 		}
 	}
 
-	/**
-	 * test function for closing the db
-	 */
-	function close() {
-		db.close();
-		open = false;
-	}
-
-	return Object.freeze({
-		get dbName() {
-			return dbName;
-		},
-		set dbName(val) {
-			dbName = val;
-		},
-		get lock() {
-			return lock;
-		},
-		set lock(val) {
-			lock = Boolean(val);
-		},
-		get active() {
-			return active;
-		},
-		set active(val) {
-			active = val;
-		},
-		get listLength() {
-			return listLength;
-		},
-		set listLength(val) {
-			listLength = val;
-		},
-		get listPage() {
-			return listPage;
-		},
-		set listPage(val) {
-			listPage = val;
-		},
-		getItem,
-		setItem,
-		deleteItem,
-		clearAll,
-		getSaveDetails,
-		getAllSaves,
-		saveState,
-		loadState,
-		importFromLocalStorage,
-		saveList,
-		get footerHTML() {
-			return footerHTML;
-		},
-		set footerHTML(val) {
-			return footerHTML = val;
-		},
-		init(dbName) {
-			return openDB(dbName);
-		},
-		close,
-		updateSettings,
-		baddies,
-		funNuke,
-		ekuNnuf,
-	});
+	return Object.freeze(Object.defineProperties({}, {
+		/* eslint-disable brace-style */
+		dbName:         { get() { return _dbName;    }, set(val) { _dbName = val; } },
+		lock:           { get() { return _lock;      }, set(val) { _lock = Boolean(val); } },
+		active:         { get() { return _active;    }, set(val) { _active = Boolean(val); } },
+		listLength:     { get() { return listLength; }, set(val) { listLength = val; } },
+		listPage:       { get() { return listPage;   }, set(val) { listPage = val; } },
+		footerHTML:     { get() { return footerHTML; }, set(val) { footerHTML = val; } },
+		baddies:        { get() { return baddies; } },
+		init:           { value(dbName) { return openDB(dbName); } },
+		getSaveDetails: { value: getSaveDetails },
+		getAllSaves:    { value: getAllSaves },
+		saveList:       { value: saveList },
+		saveState:      { value: saveState },
+		loadState:      { value: loadState },
+		setItem:        { value: setItem },
+		getItem:        { value: getItem },
+		deleteItem:     { value: deleteItem },
+		clearAll:       { value: clearAll },
+		updateSettings: { value: updateSettings },
+		funNuke:        { value: funNuke },
+		ekuNnuf:        { value: ekuNnuf },
+		importFromLocalStorage: { value: importFromLocalStorage },
+	}));
 })();
 window.idb = idb;

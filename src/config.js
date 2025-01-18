@@ -35,7 +35,8 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 
 	// Navigation settings.
 	let _navigationOverride;
-	let _navigationRememberYPos ;
+	let _navigationRememberYPos;
+	let _navigationGoToHell;
 
 	// Passages settings.
 	let _passagesDescriptions;
@@ -195,6 +196,8 @@ var Config = (() => { // eslint-disable-line no-unused-vars, no-var
 
 				_navigationOverride = value;
 			},
+			get gotohell() { return _navigationGoToHell; },
+			set gotohell(value) { _navigationGoToHell = value; },
 			get rememberYPos() { return _navigationRememberYPos; },
 			set rememberYPos(value) { _navigationRememberYPos = value; }
 		}),
