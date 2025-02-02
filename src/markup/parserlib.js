@@ -1111,7 +1111,18 @@
 
 			if (!varExpression.startsWith(Patterns.globalSigil)) {
 				const result = State.getVar(varExpression);
-				jQuery(document.createTextNode(result == null ? varExpression : stringFrom(result))).appendTo(w.output);
+				if (result == null) { // lazy equality for null
+					jQuery(document.createTextNode(w.matchText)).appendTo(w.output);
+				}
+				else {
+					new Wikifier(
+						(Config.debug
+							? new DebugView(w.output, 'variable', w.matchText, w.matchText) // Debug view setup.
+							: w
+						).output,
+						stringFrom(result)
+					);
+				}
 				return;
 			}
 
