@@ -196,7 +196,6 @@ const idb = (() => {
 			if (save.jdelta) delete save.jdelta; // jdelta wasn't a great idea
 			if (save.delta) save.history = State.deltaDecode(save.delta);
 			delete save.delta;
-			if (window.DoLSave) DoLSave.decompressIfNeeded({ state: save });
 
 			const vars = save.history[save.index].variables;
 			if (!vars.saveId) {
@@ -1075,17 +1074,7 @@ const idb = (() => {
 				// add instant idb switcher
 				ul = document.createElement("ul");
 				ul.className = "buttons";
-				const idbtoggle = document.createElement("button");
-				idbtoggle.id = "saves-idb-toggle";
-				idbtoggle.className = "saveMenuButton";
-				idbtoggle.innerText = L10n.get("savesOptionsUseLegacy");
-				idbtoggle.onclick = () => {
-					updateSettings("active", false);
-					if (window.DoLSave)	$.wiki("<<replace #saveList>><<saveList>><</replace>>");
-					else UI.buildSaves();
-				};
 				li = document.createElement("li");
-				li.appendChild(idbtoggle);
 				ul.appendChild(li);
 				list.appendChild(ul);
 

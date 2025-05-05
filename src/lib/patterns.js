@@ -111,8 +111,12 @@ var Patterns = (() => { // eslint-disable-line no-unused-vars, no-var
 	const identifier          = `${identifierFirstChar}${identifierNextChar}*`;
 
 	// Variable patterns.
-	const variableSigil = '[$_]';
+	const variableSigil = '[$_=]';
+	const globalSigil = '=';
 	const variable      = variableSigil + identifier;
+
+	// Recursive
+	const insideParensRecursive = '\\((?:[^()]*|\\((?:[^()]*|\\([^()]*\\))*\\))*\\)|\\[(?:[^[\\]]*|\\[(?:[^[\\]]*|\\[[^[\\]]*\\])*\\])*\\]';
 
 	// Macro name pattern.
 	const macroName = '[A-Za-z][\\w-]*|[=-]';
@@ -177,8 +181,10 @@ var Patterns = (() => { // eslint-disable-line no-unused-vars, no-var
 		identifierFirstChar,
 		identifierNextChar,
 		identifier,
+		insideParensRecursive,
 		variableSigil,
 		variable,
+		globalSigil,
 		macroName,
 		templateName,
 		htmlTagName,
