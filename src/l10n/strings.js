@@ -109,6 +109,7 @@ var l10nStrings = { // eslint-disable-line no-unused-vars, no-var
 	savesPagerSavesPerPage    : 'Saves per page:',
 	savesOptionsConfirmOn     : 'Require confirmation on:',
 	savesOptionsOverwrite     : 'Overwrite ',
+	savesOptionsUseLegacy     : 'Switch to legacy save storage',
 	savesWarningSaveOnSlot    : 'Save on slot',
 	savesWarningOverwriteSlot : 'Overwrite save in slot',
 	savesWarningOverwriteID   : 'Save ID does not match, continue with overwrite?',
