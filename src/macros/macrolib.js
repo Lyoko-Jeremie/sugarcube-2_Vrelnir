@@ -46,8 +46,17 @@
 				*/
 				while ((match = tsVarRe.exec(this.args.raw)) !== null) {
 					const varName = match[1];
-					const varKey  = varName.slice(1);
-					const store   = varName[0] === '$' ? State.variables : State.temporary;
+					const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+					let store;
+					if (varName.startsWith('$_')) {
+						store = State.local;
+					}
+					else if (varName[0] === '$') {
+						store = State.variables;
+					}
+					else {
+						store = State.temporary;
+					}
 
 					if (store.hasOwnProperty(varKey)) {
 						valueCache[varKey] = store[varKey];
@@ -61,13 +70,19 @@
 			finally {
 				// Revert the variable shadowing.
 				this.shadows.forEach(varName => {
-					const varKey = varName.slice(1);
-					const store  = varName[0] === '$' ? State.variables : State.temporary;
-
-					if (valueCache.hasOwnProperty(varKey)) {
-						store[varKey] = valueCache[varKey];
+					const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+					let store;
+					if (varName.startsWith('$_')) {
+						store = State.local;
 					}
 					else {
+						store = varName[0] === '$' ? State.variables : State.temporary;
+					}
+
+					if (valueCache.hasOwnProperty(varKey)) {
+						if (store) store[varKey] = valueCache[varKey];
+					}
+					else if (store) {
 						delete store[varKey];
 					}
 				});
@@ -664,7 +679,7 @@
 									$wrapper.addClass(`${className}-cursor`);
 								}
 							}
-						};
+								};
 
 						// Fire the typing start event.
 						$wrapper.trigger(typingStartId);
@@ -946,7 +961,7 @@
 		skipArgs    : true,
 		tags        : null,
 		hasRangeRe  : new RegExp(`^\\S${Patterns.anyChar}*?\\s+range\\s+\\S${Patterns.anyChar}*?$`),
-		rangeRe     : new RegExp(`^(?:State\\.(variables|temporary)\\.(${Patterns.identifier})\\s*,\\s*)?State\\.(variables|temporary)\\.(${Patterns.identifier})\\s+range\\s+(\\S${Patterns.anyChar}*?)$`),
+		rangeRe     : new RegExp(`^(?:State\\.(variables|temporary|local)\\.(${Patterns.identifier})\\s*,\\s*)?State\\.(variables|temporary|local)\\.(${Patterns.identifier})\\s+range\\s+(\\S${Patterns.anyChar}*?)$`),
 		threePartRe : /^([^;]*?)\s*;\s*([^;]*?)\s*;\s*([^;]*?)$/,
 		forInRe     : /^\S+\s+in\s+\S+/i,
 		forOfRe     : /^\S+\s+of\s+\S+/i,
@@ -1322,8 +1337,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			const varId        = Util.slugify(varName);
@@ -1391,8 +1406,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			const varId = Util.slugify(varName);
@@ -1683,8 +1698,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			// Custom debug view setup.
@@ -1793,8 +1808,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			const varId      = Util.slugify(varName);
@@ -1869,8 +1884,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			// Custom debug view setup.
@@ -3756,6 +3771,7 @@
 					isWidget : true,
 					handler  : (function (widgetCode) {
 						return function () {
+							State.pushLocal();
 							const shadowStore = {};
 
 							// Cache the existing value of the `_args` variable, if necessary.
@@ -3779,17 +3795,6 @@
 								State.temporary.contents = this.payload[0].contents;
 								this.addShadow('_contents');
 							}
-
-							/* legacy */
-							// Cache the existing value of the `$args` variable, if necessary.
-							if (State.variables.hasOwnProperty('args')) {
-								shadowStore.$args = State.variables.args;
-							}
-
-							// Set up the widget `$args` variable and add a shadow.
-							State.variables.args = State.temporary.args;
-							this.addShadow('$args');
-							/* /legacy */
 
 							try {
 								// Set up the error trapping variables.
@@ -3833,15 +3838,7 @@
 									}
 								}
 
-								/* legacy */
-								// Revert the `$args` variable shadowing.
-								if (shadowStore.hasOwnProperty('$args')) {
-									State.variables.args = shadowStore.$args;
-								}
-								else {
-									delete State.variables.args;
-								}
-								/* /legacy */
+								State.popLocal();
 							}
 						};
 					})(this.payload[0].contents)

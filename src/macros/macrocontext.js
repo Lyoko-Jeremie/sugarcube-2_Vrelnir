@@ -174,9 +174,18 @@ var MacroContext = (() => { // eslint-disable-line no-unused-vars, no-var
 			if (typeof callback === 'function') {
 				shadowStore = {};
 				this.shadowView.forEach(varName => {
-					const varKey = varName.slice(1);
-					const store  = varName[0] === '$' ? State.variables : State.temporary;
-					shadowStore[varName] = store[varKey];
+					const varKey = varName.startsWith('$_') ? varName.slice(2) : varName.slice(1);
+					let store;
+					if (varName.startsWith('$_')) {
+						store = State.local;
+					}
+					else if (varName[0] === '$') {
+						store = State.variables;
+					}
+					else {
+						store = State.temporary;
+					}
+					shadowStore[varName] = store ? store[varKey] : undefined;
 				});
 			}
 
@@ -202,14 +211,26 @@ var MacroContext = (() => { // eslint-disable-line no-unused-vars, no-var
 							shadow values.
 						*/
 						shadowNames.forEach(varName => {
-							const varKey = varName.slice(1);
-							const store  = varName[0] === '$' ? State.variables : State.temporary;
-
-							if (store.hasOwnProperty(varKey)) {
-								valueCache[varKey] = store[varKey];
+							const varKey = varName.startsWith('$_') ? varName.slice(2) : varName.slice(1);
+							let store;
+							if (varName.startsWith('$_')) {
+								store = State.local;
+							}
+							else if (varName[0] === '$') {
+								store = State.variables;
+							}
+							else {
+								store = State.temporary;
 							}
 
-							store[varKey] = shadowStore[varName];
+							if (store && Object.prototype.hasOwnProperty.call(store, varKey)) {
+								valueCache[varName] = store[varKey];
+							}
+
+							if (store) {
+								// Shadow applied.
+								store[varKey] = shadowStore[varName];
+							}
 						});
 
 						// Cache the existing macro execution context and assign the shadow context.
@@ -227,19 +248,27 @@ var MacroContext = (() => { // eslint-disable-line no-unused-vars, no-var
 
 						// Revert the variable shadowing.
 						shadowNames.forEach(varName => {
-							const varKey = varName.slice(1);
-							const store  = varName[0] === '$' ? State.variables : State.temporary;
-
-							/*
-								Update the shadow store with the variable's current value, in case it
-								was modified during the callback.
-							*/
-							shadowStore[varName] = store[varKey];
-
-							if (valueCache.hasOwnProperty(varKey)) {
-								store[varKey] = valueCache[varKey];
+							const varKey = varName.startsWith('$_') ? varName.slice(2) : varName.slice(1);
+							let store;
+							if (varName.startsWith('$_')) {
+								store = State.local;
+							}
+							else if (varName[0] === '$') {
+								store = State.variables;
 							}
 							else {
+								store = State.temporary;
+							}
+
+							// Update the shadow store in case it was modified during the callback
+							if (store) {
+								shadowStore[varName] = store[varKey];
+							}
+
+							if (valueCache.hasOwnProperty(varName)) {
+								if (store) store[varKey] = valueCache[varName];
+							}
+							else if (store) {
 								delete store[varKey];
 							}
 						});

@@ -451,6 +451,9 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		TempState = {}; // eslint-disable-line no-undef
 		State.clearTemporary();
 
+		State.clearLocal();
+		State.pushLocal();
+
 		// Debug view setup.
 		let passageReadyOutput;
 		let passageDoneOutput;
@@ -761,6 +764,9 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 			content : passageEl,
 			passage
 		});
+
+		// Pop the last frame - just in case.
+		State.popLocal();
 
 		// Reset the engine state.
 		_state = States.Idle;
