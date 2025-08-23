@@ -7,8 +7,8 @@
 
 ***********************************************************************************************************************/
 /*
-	global Config, DebugView, Engine, Has, L10n, Macro, NodeTyper, Patterns, Scripting, SimpleAudio, State,
-	       Story, TempState, Util, Wikifier, postdisplay, prehistory, storage, stringFrom
+	global Perflog, Config, DebugView, Engine, Has, L10n, Macro, NodeTyper, Patterns, Scripting, SimpleAudio, State,
+	       Story, TempState, Util, Wikifier, postdisplay, prehistory, storage, stringFrom, Links
 */
 
 (() => {
@@ -1038,6 +1038,18 @@
 			let first  = true;
 			let safety = Config.macros.maxLoopIterations;
 
+			let compiledInit = null;
+			let compiledCondition = null;
+			let compiledPost = null;
+
+			try {
+				if (init) compiledInit = Scripting.evalJavaScript(`(function(){${Scripting.parse(String(init))}})`);
+				if (condition != null && condition !== true) compiledCondition = Scripting.evalJavaScript(`(function(){return (${Scripting.parse(String(condition))});})`);
+				if (post) compiledPost = Scripting.evalJavaScript(`(function(){${Scripting.parse(String(post))}})`);
+			}
+			catch (ex) {
+			}
+
 			// Custom debug view setup.
 			if (Config.debug) {
 				this.debugView.modes({ block : true });
@@ -1048,21 +1060,44 @@
 
 				if (init) {
 					try {
-						evalJavaScript(init);
+						(compiledInit ? compiledInit : () => evalJavaScript(init))();
 					}
 					catch (ex) {
 						return this.error(`bad init expression: ${typeof ex === 'object' ? ex.message : ex}`);
 					}
 				}
 
-				while (evalJavaScript(condition)) {
+				const isStatic = !new RegExp(`(?:(${Patterns.variable})|<<|\\$\{)`).test(payload);
+				const basePayload = payload.replace(/^\n/, '');
+				let staticFrag = null;
+
+				if (isStatic) {
+					staticFrag = document.createDocumentFragment();
+					new Wikifier(staticFrag, basePayload);
+				}
+
+				const conditionEval = compiledCondition ? compiledCondition : () => evalJavaScript(condition);
+				let postEval = null;
+				if (post) {
+					postEval = compiledPost ? compiledPost : () => evalJavaScript(post);
+				}
+
+				while (conditionEval()) {
 					if (Wikifier.stopWikify) return;
 
 					if (--safety < 0) {
 						return this.error(`exceeded configured maximum loop iterations (${Config.macros.maxLoopIterations})`);
 					}
 
-					new Wikifier(this.output, first ? payload.replace(/^\n/, '') : payload);
+					if (isStatic) {
+						this.output.appendChild(staticFrag.cloneNode(true));
+					}
+					else {
+						const wikifySource = first ? basePayload : payload;
+						const frag = document.createDocumentFragment();
+						new Wikifier(frag, wikifySource);
+						this.output.appendChild(frag);
+					}
 
 					if (first) {
 						first = false;
@@ -1080,7 +1115,7 @@
 
 					if (post) {
 						try {
-							evalJavaScript(post);
+							postEval();
 						}
 						catch (ex) {
 							return this.error(`bad post expression: ${typeof ex === 'object' ? ex.message : ex}`);
@@ -1097,15 +1132,7 @@
 		},
 
 		handleForRange(payload, indexVar, valueVar, rangeExp) {
-			let first     = true;
-			let rangeList;
-
-			try {
-				rangeList = this.self.toRangeList(rangeExp);
-			}
-			catch (ex) {
-				return this.error(ex.message);
-			}
+			let first = true;
 
 			// Custom debug view setup.
 			if (Config.debug) {
@@ -1115,28 +1142,96 @@
 			try {
 				TempState.break = null;
 
-				for (let i = 0; i < rangeList.length; ++i) {
+				let rangeValue;
+
+				try {
+					rangeValue = Scripting.evalJavaScript(rangeExp[0] === '{' ? `(${rangeExp})` : rangeExp);
+				}
+				catch (ex) {
+					return this.error(typeof ex === 'object' ? ex.message : ex);
+				}
+				const isStatic = !(new RegExp(Patterns.variable).test(payload) || payload.indexOf('<<') !== -1 || payload.indexOf('${') !== -1);
+				const baseSource = payload.replace(/^\n/, '');
+				let staticFrag = null;
+
+				if (isStatic) {
+					staticFrag = document.createDocumentFragment();
+					new Wikifier(staticFrag, baseSource);
+				}
+
+				const renderBody = (idx, val) => {
 					if (indexVar.name) {
-						State[indexVar.type][indexVar.name] = rangeList[i][0];
+						State[indexVar.type][indexVar.name] = idx;
 					}
 
-					State[valueVar.type][valueVar.name] = rangeList[i][1];
+					State[valueVar.type][valueVar.name] = val;
 
-					new Wikifier(this.output, first ? payload.replace(/^\n/, '') : payload);
-
-					if (first) {
-						first = false;
+					if (isStatic) {
+						this.output.appendChild(staticFrag.cloneNode(true));
 					}
+					else {
+						const frag = document.createDocumentFragment();
+						new Wikifier(frag, first ? baseSource : payload);
+						this.output.appendChild(frag);
+					}
+				};
 
-					if (TempState.break != null) { // lazy equality for null
-						if (TempState.break === 1) {
-							TempState.break = null;
+				if (typeof rangeValue === 'string') {
+					for (let i = 0; i < rangeValue.length;) {
+						const obj = Util.charAndPosAt(rangeValue, i);
+						renderBody(i, obj.char);
+						i = 1 + obj.end;
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
 						}
-						else if (TempState.break === 2) {
-							TempState.break = null;
-							break;
+					}
+				}
+				else if (Array.isArray(rangeValue)) {
+					for (let i = 0; i < rangeValue.length; ++i) {
+						renderBody(i, rangeValue[i]);
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
 						}
 					}
+				}
+				else if (rangeValue instanceof Set) {
+					let i = 0;
+					for (const val of rangeValue) {
+						renderBody(i++, val);
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
+						}
+					}
+				}
+				else if (rangeValue instanceof Map) {
+					for (const [key, val] of rangeValue) {
+						renderBody(key, val);
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
+						}
+					}
+				}
+				else if (typeof rangeValue === 'object' && rangeValue !== null) {
+					const keys = Object.keys(rangeValue);
+					for (let i = 0; i < keys.length; ++i) {
+						renderBody(keys[i], rangeValue[keys[i]]);
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
+						}
+					}
+				}
+				else {
+					throw new Error(`unsupported range expression type: ${typeof rangeValue}`);
 				}
 			}
 			catch (ex) {
@@ -3771,6 +3866,7 @@
 					isWidget : true,
 					handler  : (function (widgetCode) {
 						return function () {
+							Perflog.logWidgetStart(widgetName);
 							State.pushLocal();
 							const shadowStore = {};
 
@@ -3813,7 +3909,7 @@
 									this.output.appendChild(resFrag);
 								}
 								else {
-									return this.error(`error${errList.length > 1 ? 's' : ''} within widget code (${errList.join('; ')})`);
+									return this.error(`error${errList.length > 1 ? '' : 's'} within widget code (${errList.join('; ')})`);
 								}
 							}
 							catch (ex) {
@@ -3839,6 +3935,7 @@
 								}
 
 								State.popLocal();
+								Perflog.logWidgetEnd(widgetName);
 							}
 						};
 					})(this.payload[0].contents)
