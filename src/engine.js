@@ -417,6 +417,13 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		Go to the moment which directly precedes the active moment and show it.
 	*/
 	function engineBackward() {
+		// prevent going backward into the starting passage
+		if (State.length >= 2) {
+			const prev = State.peek(1);
+			if (prev && prev.title === Config.passages.start) {
+				return false;
+			}
+		}
 		return engineGo(-1);
 	}
 
