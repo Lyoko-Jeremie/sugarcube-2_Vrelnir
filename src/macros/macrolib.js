@@ -3900,6 +3900,25 @@
 								// Wikify the widget's code.
 								new Wikifier(resFrag, widgetCode);
 
+								// Returns value on <<exit>>
+								if (this.hasOwnProperty('_widgetReturn')) {
+									const returnValue = this._widgetReturn;
+									while (resFrag.firstChild) {
+										resFrag.removeChild(resFrag.firstChild);
+									}
+									if (returnValue != null && returnValue !== '') {
+										// Temporarily reset stop flag
+										const prevStop = Wikifier.stopWikify;
+										Wikifier.stopWikify = 0;
+										try {
+											new Wikifier(resFrag, String(returnValue));
+										}
+										finally {
+											Wikifier.stopWikify = prevStop;
+										}
+									}
+								}
+
 								// Carry over the output, unless there were errors.
 								Array.from(resFrag.querySelectorAll('.error')).forEach(errEl => {
 									errList.push(errEl.textContent);
@@ -3963,6 +3982,22 @@
 	*/
 	Macro.add(['exit', 'exitAll'], {
 		handler() {
+			if (this.name === 'exit' && this.args && this.args.full && this.args.full.length > 0) {
+				try {
+					const result = stringFrom(Scripting.evalJavaScript(this.args.full));
+					if (result !== null) {
+						// Find nearest widget context
+						const widgetCtx = this.contextSelect(ctx => ctx.self && ctx.self.isWidget);
+						if (widgetCtx) {
+							widgetCtx._widgetReturn = result;
+						}
+					}
+				}
+				catch (ex) {
+					return this.error(`bad evaluation: ${typeof ex === 'object' ? `${ex.name}: ${ex.message}` : ex}`);
+				}
+			}
+
 			Wikifier.stopWikify = this.name === 'exit' ? 1 : 2;
 		}
 	});
