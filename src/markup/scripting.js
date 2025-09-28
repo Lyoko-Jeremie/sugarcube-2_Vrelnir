@@ -667,7 +667,6 @@ var Scripting = (() => { // eslint-disable-line no-unused-vars, no-var
 		function sequence(callbacks) {
 			return callbacks.reduce((seq, fn) => seq = seq.then(fn), Promise.resolve()); // eslint-disable-line no-param-reassign
 		}
-
 		/*
 			Import scripts from a URL.
 		*/
@@ -716,6 +715,8 @@ var Scripting = (() => { // eslint-disable-line no-unused-vars, no-var
 	const parse = (() => {
 		const tokenTable = Util.toEnum({
 			/* eslint-disable quote-props */
+			// Local $_variable sigil-prefix
+			'$_'    : 'State.local.',
 			// Story $variable sigil-prefix.
 			'$'     : 'State.variables.',
 			// Temporary _variable sigil-prefix.
@@ -793,7 +794,12 @@ var Scripting = (() => { // eslint-disable-line no-unused-vars, no-var
 					// If the token is a story $variable or temporary _variable, reset it
 					// to just its sigil—for later mapping.
 					else if (varTest.test(token)) {
-						token = token[0];
+						if (token.startsWith('$_')) {
+							token = '$_';
+						}
+						else {
+							token = token[0];
+						}
 					}
 
 					// If the token is `is`, check to see if it's followed by `not`, if so,

@@ -417,6 +417,13 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		Go to the moment which directly precedes the active moment and show it.
 	*/
 	function engineBackward() {
+		// prevent going backward into the starting passage
+		if (State.length >= 2) {
+			const prev = State.peek(1);
+			if (prev && prev.title === Config.passages.start) {
+				return false;
+			}
+		}
 		return engineGo(-1);
 	}
 
@@ -450,6 +457,9 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		// Reset the temporary state and variables objects.
 		TempState = {}; // eslint-disable-line no-undef
 		State.clearTemporary();
+
+		State.clearLocal();
+		State.pushLocal();
 
 		// Debug view setup.
 		let passageReadyOutput;
@@ -761,6 +771,9 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 			content : passageEl,
 			passage
 		});
+
+		// Pop the last frame - just in case.
+		State.popLocal();
 
 		// Reset the engine state.
 		_state = States.Idle;

@@ -7,8 +7,8 @@
 
 ***********************************************************************************************************************/
 /*
-	global Config, DebugView, Engine, Has, L10n, Macro, NodeTyper, Patterns, Scripting, SimpleAudio, State,
-	       Story, TempState, Util, Wikifier, postdisplay, prehistory, storage, stringFrom
+	global Perflog, Config, DebugView, Engine, Has, L10n, Macro, NodeTyper, Patterns, Scripting, SimpleAudio, State,
+	       Story, TempState, Util, Wikifier, postdisplay, prehistory, storage, stringFrom, Links
 */
 
 (() => {
@@ -46,8 +46,17 @@
 				*/
 				while ((match = tsVarRe.exec(this.args.raw)) !== null) {
 					const varName = match[1];
-					const varKey  = varName.slice(1);
-					const store   = varName[0] === '$' ? State.variables : State.temporary;
+					const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+					let store;
+					if (varName.startsWith('$_')) {
+						store = State.local;
+					}
+					else if (varName[0] === '$') {
+						store = State.variables;
+					}
+					else {
+						store = State.temporary;
+					}
 
 					if (store.hasOwnProperty(varKey)) {
 						valueCache[varKey] = store[varKey];
@@ -61,13 +70,19 @@
 			finally {
 				// Revert the variable shadowing.
 				this.shadows.forEach(varName => {
-					const varKey = varName.slice(1);
-					const store  = varName[0] === '$' ? State.variables : State.temporary;
-
-					if (valueCache.hasOwnProperty(varKey)) {
-						store[varKey] = valueCache[varKey];
+					const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+					let store;
+					if (varName.startsWith('$_')) {
+						store = State.local;
 					}
 					else {
+						store = varName[0] === '$' ? State.variables : State.temporary;
+					}
+
+					if (valueCache.hasOwnProperty(varKey)) {
+						if (store) store[varKey] = valueCache[varKey];
+					}
+					else if (store) {
 						delete store[varKey];
 					}
 				});
@@ -664,7 +679,7 @@
 									$wrapper.addClass(`${className}-cursor`);
 								}
 							}
-						};
+								};
 
 						// Fire the typing start event.
 						$wrapper.trigger(typingStartId);
@@ -946,7 +961,7 @@
 		skipArgs    : true,
 		tags        : null,
 		hasRangeRe  : new RegExp(`^\\S${Patterns.anyChar}*?\\s+range\\s+\\S${Patterns.anyChar}*?$`),
-		rangeRe     : new RegExp(`^(?:State\\.(variables|temporary)\\.(${Patterns.identifier})\\s*,\\s*)?State\\.(variables|temporary)\\.(${Patterns.identifier})\\s+range\\s+(\\S${Patterns.anyChar}*?)$`),
+		rangeRe     : new RegExp(`^(?:State\\.(variables|temporary|local)\\.(${Patterns.identifier})\\s*,\\s*)?State\\.(variables|temporary|local)\\.(${Patterns.identifier})\\s+range\\s+(\\S${Patterns.anyChar}*?)$`),
 		threePartRe : /^([^;]*?)\s*;\s*([^;]*?)\s*;\s*([^;]*?)$/,
 		forInRe     : /^\S+\s+in\s+\S+/i,
 		forOfRe     : /^\S+\s+of\s+\S+/i,
@@ -1023,6 +1038,18 @@
 			let first  = true;
 			let safety = Config.macros.maxLoopIterations;
 
+			let compiledInit = null;
+			let compiledCondition = null;
+			let compiledPost = null;
+
+			try {
+				if (init) compiledInit = Scripting.evalJavaScript(`(function(){${Scripting.parse(String(init))}})`);
+				if (condition != null && condition !== true) compiledCondition = Scripting.evalJavaScript(`(function(){return (${Scripting.parse(String(condition))});})`);
+				if (post) compiledPost = Scripting.evalJavaScript(`(function(){${Scripting.parse(String(post))}})`);
+			}
+			catch (ex) {
+			}
+
 			// Custom debug view setup.
 			if (Config.debug) {
 				this.debugView.modes({ block : true });
@@ -1033,21 +1060,44 @@
 
 				if (init) {
 					try {
-						evalJavaScript(init);
+						(compiledInit ? compiledInit : () => evalJavaScript(init))();
 					}
 					catch (ex) {
 						return this.error(`bad init expression: ${typeof ex === 'object' ? ex.message : ex}`);
 					}
 				}
 
-				while (evalJavaScript(condition)) {
+				const isStatic = !new RegExp(`(?:(${Patterns.variable})|<<|\\$\{)`).test(payload);
+				const basePayload = payload.replace(/^\n/, '');
+				let staticFrag = null;
+
+				if (isStatic) {
+					staticFrag = document.createDocumentFragment();
+					new Wikifier(staticFrag, basePayload);
+				}
+
+				const conditionEval = compiledCondition ? compiledCondition : () => evalJavaScript(condition);
+				let postEval = null;
+				if (post) {
+					postEval = compiledPost ? compiledPost : () => evalJavaScript(post);
+				}
+
+				while (conditionEval()) {
 					if (Wikifier.stopWikify) return;
 
 					if (--safety < 0) {
 						return this.error(`exceeded configured maximum loop iterations (${Config.macros.maxLoopIterations})`);
 					}
 
-					new Wikifier(this.output, first ? payload.replace(/^\n/, '') : payload);
+					if (isStatic) {
+						this.output.appendChild(staticFrag.cloneNode(true));
+					}
+					else {
+						const wikifySource = first ? basePayload : payload;
+						const frag = document.createDocumentFragment();
+						new Wikifier(frag, wikifySource);
+						this.output.appendChild(frag);
+					}
 
 					if (first) {
 						first = false;
@@ -1065,7 +1115,7 @@
 
 					if (post) {
 						try {
-							evalJavaScript(post);
+							postEval();
 						}
 						catch (ex) {
 							return this.error(`bad post expression: ${typeof ex === 'object' ? ex.message : ex}`);
@@ -1082,15 +1132,7 @@
 		},
 
 		handleForRange(payload, indexVar, valueVar, rangeExp) {
-			let first     = true;
-			let rangeList;
-
-			try {
-				rangeList = this.self.toRangeList(rangeExp);
-			}
-			catch (ex) {
-				return this.error(ex.message);
-			}
+			let first = true;
 
 			// Custom debug view setup.
 			if (Config.debug) {
@@ -1100,28 +1142,96 @@
 			try {
 				TempState.break = null;
 
-				for (let i = 0; i < rangeList.length; ++i) {
+				let rangeValue;
+
+				try {
+					rangeValue = Scripting.evalJavaScript(rangeExp[0] === '{' ? `(${rangeExp})` : rangeExp);
+				}
+				catch (ex) {
+					return this.error(typeof ex === 'object' ? ex.message : ex);
+				}
+				const isStatic = !(new RegExp(Patterns.variable).test(payload) || payload.indexOf('<<') !== -1 || payload.indexOf('${') !== -1);
+				const baseSource = payload.replace(/^\n/, '');
+				let staticFrag = null;
+
+				if (isStatic) {
+					staticFrag = document.createDocumentFragment();
+					new Wikifier(staticFrag, baseSource);
+				}
+
+				const renderBody = (idx, val) => {
 					if (indexVar.name) {
-						State[indexVar.type][indexVar.name] = rangeList[i][0];
+						State[indexVar.type][indexVar.name] = idx;
 					}
 
-					State[valueVar.type][valueVar.name] = rangeList[i][1];
+					State[valueVar.type][valueVar.name] = val;
 
-					new Wikifier(this.output, first ? payload.replace(/^\n/, '') : payload);
-
-					if (first) {
-						first = false;
+					if (isStatic) {
+						this.output.appendChild(staticFrag.cloneNode(true));
 					}
+					else {
+						const frag = document.createDocumentFragment();
+						new Wikifier(frag, first ? baseSource : payload);
+						this.output.appendChild(frag);
+					}
+				};
 
-					if (TempState.break != null) { // lazy equality for null
-						if (TempState.break === 1) {
-							TempState.break = null;
+				if (typeof rangeValue === 'string') {
+					for (let i = 0; i < rangeValue.length;) {
+						const obj = Util.charAndPosAt(rangeValue, i);
+						renderBody(i, obj.char);
+						i = 1 + obj.end;
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
 						}
-						else if (TempState.break === 2) {
-							TempState.break = null;
-							break;
+					}
+				}
+				else if (Array.isArray(rangeValue)) {
+					for (let i = 0; i < rangeValue.length; ++i) {
+						renderBody(i, rangeValue[i]);
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
 						}
 					}
+				}
+				else if (rangeValue instanceof Set) {
+					let i = 0;
+					for (const val of rangeValue) {
+						renderBody(i++, val);
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
+						}
+					}
+				}
+				else if (rangeValue instanceof Map) {
+					for (const [key, val] of rangeValue) {
+						renderBody(key, val);
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
+						}
+					}
+				}
+				else if (typeof rangeValue === 'object' && rangeValue !== null) {
+					const keys = Object.keys(rangeValue);
+					for (let i = 0; i < keys.length; ++i) {
+						renderBody(keys[i], rangeValue[keys[i]]);
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
+						}
+					}
+				}
+				else {
+					throw new Error(`unsupported range expression type: ${typeof rangeValue}`);
 				}
 			}
 			catch (ex) {
@@ -1322,8 +1432,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			const varId        = Util.slugify(varName);
@@ -1391,8 +1501,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			const varId = Util.slugify(varName);
@@ -1683,8 +1793,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			// Custom debug view setup.
@@ -1793,8 +1903,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			const varId      = Util.slugify(varName);
@@ -1869,8 +1979,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			// Custom debug view setup.
@@ -3756,6 +3866,8 @@
 					isWidget : true,
 					handler  : (function (widgetCode) {
 						return function () {
+							Perflog.logWidgetStart(widgetName);
+							State.pushLocal();
 							const shadowStore = {};
 
 							// Cache the existing value of the `_args` variable, if necessary.
@@ -3780,17 +3892,6 @@
 								this.addShadow('_contents');
 							}
 
-							/* legacy */
-							// Cache the existing value of the `$args` variable, if necessary.
-							if (State.variables.hasOwnProperty('args')) {
-								shadowStore.$args = State.variables.args;
-							}
-
-							// Set up the widget `$args` variable and add a shadow.
-							State.variables.args = State.temporary.args;
-							this.addShadow('$args');
-							/* /legacy */
-
 							try {
 								// Set up the error trapping variables.
 								const resFrag = document.createDocumentFragment();
@@ -3798,6 +3899,25 @@
 
 								// Wikify the widget's code.
 								new Wikifier(resFrag, widgetCode);
+
+								// Returns value on <<exit>>
+								if (this.hasOwnProperty('_widgetReturn')) {
+									const returnValue = this._widgetReturn;
+									while (resFrag.firstChild) {
+										resFrag.removeChild(resFrag.firstChild);
+									}
+									if (returnValue != null && returnValue !== '') {
+										// Temporarily reset stop flag
+										const prevStop = Wikifier.stopWikify;
+										Wikifier.stopWikify = 0;
+										try {
+											new Wikifier(resFrag, String(returnValue));
+										}
+										finally {
+											Wikifier.stopWikify = prevStop;
+										}
+									}
+								}
 
 								// Carry over the output, unless there were errors.
 								Array.from(resFrag.querySelectorAll('.error')).forEach(errEl => {
@@ -3808,7 +3928,7 @@
 									this.output.appendChild(resFrag);
 								}
 								else {
-									return this.error(`error${errList.length > 1 ? 's' : ''} within widget code (${errList.join('; ')})`);
+									return this.error(`error${errList.length > 1 ? '' : 's'} within widget code (${errList.join('; ')})`);
 								}
 							}
 							catch (ex) {
@@ -3833,15 +3953,8 @@
 									}
 								}
 
-								/* legacy */
-								// Revert the `$args` variable shadowing.
-								if (shadowStore.hasOwnProperty('$args')) {
-									State.variables.args = shadowStore.$args;
-								}
-								else {
-									delete State.variables.args;
-								}
-								/* /legacy */
+								State.popLocal();
+								Perflog.logWidgetEnd(widgetName);
 							}
 						};
 					})(this.payload[0].contents)
@@ -3869,6 +3982,22 @@
 	*/
 	Macro.add(['exit', 'exitAll'], {
 		handler() {
+			if (this.name === 'exit' && this.args && this.args.full && this.args.full.length > 0) {
+				try {
+					const result = stringFrom(Scripting.evalJavaScript(this.args.full));
+					if (result !== null) {
+						// Find nearest widget context
+						const widgetCtx = this.contextSelect(ctx => ctx.self && ctx.self.isWidget);
+						if (widgetCtx) {
+							widgetCtx._widgetReturn = result;
+						}
+					}
+				}
+				catch (ex) {
+					return this.error(`bad evaluation: ${typeof ex === 'object' ? `${ex.name}: ${ex.message}` : ex}`);
+				}
+			}
+
 			Wikifier.stopWikify = this.name === 'exit' ? 1 : 2;
 		}
 	});

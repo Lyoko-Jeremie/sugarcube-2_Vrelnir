@@ -46,6 +46,7 @@ const CONFIG = {
 			'src/config.js',
 			'src/simpleaudio.js',
 			'src/state.js',
+			'src/lib/perflog.js',
 			'src/markup/scripting.js',
 			'src/markup/lexer.js',
 			'src/markup/wikifier.js',

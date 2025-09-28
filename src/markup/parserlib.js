@@ -486,7 +486,6 @@
 						break;
 
 					case EOF:
-					case '\n':
 						return false;
 					}
 				}

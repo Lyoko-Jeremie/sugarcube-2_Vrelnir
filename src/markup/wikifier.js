@@ -793,8 +793,17 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 					const shadowStore = {};
 
 					getMacroContextShadowView().forEach(varName => {
-						const varKey = varName.slice(1);
-						const store  = varName[0] === '$' ? State.variables : State.temporary;
+						const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+						let store;
+						if (varName.startsWith('$_')) {
+							store = State.local;
+						}
+						else if (varName[0] === '$') {
+							store = State.variables;
+						}
+						else {
+							store = State.temporary;
+						}
 						shadowStore[varName] = store[varKey];
 					});
 
@@ -813,8 +822,17 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 								shadow values.
 							*/
 							shadowNames.forEach(varName => {
-								const varKey = varName.slice(1);
-								const store  = varName[0] === '$' ? State.variables : State.temporary;
+								const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+								let store;
+								if (varName.startsWith('$_')) {
+									store = State.local;
+								}
+								else if (varName[0] === '$') {
+									store = State.variables;
+								}
+								else {
+									store = State.temporary;
+								}
 
 								if (store.hasOwnProperty(varKey)) {
 									valueCache[varKey] = store[varKey];
@@ -829,8 +847,17 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 						finally {
 							// Revert the variable shadowing.
 							shadowNames.forEach(varName => {
-								const varKey = varName.slice(1);
-								const store  = varName[0] === '$' ? State.variables : State.temporary;
+								const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+								let store;
+								if (varName.startsWith('$_')) {
+									store = State.local;
+								}
+								else if (varName[0] === '$') {
+									store = State.variables;
+								}
+								else {
+									store = State.temporary;
+								}
 
 								/*
 									Update the shadow store with the variable's current value, in case it

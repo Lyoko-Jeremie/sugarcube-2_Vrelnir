@@ -334,8 +334,17 @@ var DebugBar = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		for (let i = 0, len = _watchList.length; i < len; ++i) {
 			const varName = _watchList[i];
-			const varKey  = varName.slice(1);
-			const store   = varName[0] === '$' ? State.variables : State.temporary;
+			const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+			let store;
+			if (varName.startsWith('$_')) {
+				store = State.local;
+			}
+			else if (varName[0] === '$') {
+				store = State.variables;
+			}
+			else {
+				store = State.temporary;
+			}
 			const $row    = jQuery(document.createElement('tr'));
 			const $delBtn = jQuery(document.createElement('button'));
 			const $code   = jQuery(document.createElement('code'));

@@ -29,8 +29,43 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 	// Temporary variables object.
 	let _tempVariables = {};
 
+	// Local variables stack.
+	const _localStack = [];
+
+	// we do NOT return this object directly from `State.local`
+	const _emptyLocal = Object.create(null);
+
+	// Cached reference to the top frame
+	let _localTopRef = _emptyLocal;
+
+	// Push a new empty frame.
+	function pushLocalFrame() {
+		const frame = {};
+		_localStack.push(frame);
+		_localTopRef = frame;
+	}
+
+	// Pop the top frame.
+	function popLocalFrame() {
+		const popped = _localStack.length > 0 ? _localStack.pop() : undefined;
+		_localTopRef = _localStack.length > 0 ? _localStack[_localStack.length - 1] : _emptyLocal;
+		return popped;
+	}
+
+	// Clear the entire stack.
+	function clearLocalStack() {
+		_localStack.length = 0;
+		_localTopRef = _emptyLocal;
+	}
+
+	// Return a shallow copy of the top frame.
+	function peekLocalFrame() {
+		const top = _localTopRef !== _emptyLocal ? _localTopRef : undefined;
+		return top ? Object.assign({}, top) : undefined;
+	}
+
 	let _qc = 1;
-	let _qchandlers = [];
+	const _qchandlers = [];
 
 	/*******************************************************************************************************************
 		State Functions.
@@ -892,6 +927,16 @@ var State = (() => { // eslint-disable-line no-unused-vars, no-var
 		*/
 		clearTemporary : { value : tempVariablesClear },
 		temporary      : { get : tempVariables },
+
+		/*
+			Local variables.
+		*/
+		pushLocal : { value : pushLocalFrame },
+		popLocal  : { value : popLocalFrame },
+		peekLocal : { value : peekLocalFrame },
+
+		local      : { get : () => _localTopRef !== _emptyLocal ? _localTopRef : Object.create(null) },
+		clearLocal : { value : clearLocalStack },
 
 		/*
 			Variable Chain Parsing Functions.
