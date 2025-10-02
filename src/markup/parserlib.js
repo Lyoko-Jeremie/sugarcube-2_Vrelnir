@@ -8,7 +8,7 @@
 ***********************************************************************************************************************/
 /*
 	global Config, DebugView, EOF, Engine, Lexer, Macro, MacroContext, Patterns, Scripting, State, Story, Template,
-	       Wikifier, stringFrom, throwError
+	       Wikifier, stringFrom, throwError, Perflog
 */
 /* eslint "no-param-reassign": [ 2, { "props" : false } ] */
 
@@ -203,6 +203,7 @@
 									that an uncaught exception is thrown during the handler call.
 								*/
 								try {
+									Perflog.logWidgetStart(name);
 									macro.handler.call(this.context);
 									/*
 										QUESTION: Swap to the following, which passes macro arguments in
@@ -219,30 +220,7 @@
 										Wikifier.stopWikify = 0;
 									}
 									this.context = this.context.parent;
-								}
-							}
-							/*
-								[DEPRECATED] Old-style/legacy macros.
-							*/
-							else {
-								/*
-									Set up the raw arguments string.
-								*/
-								const prevRawArgs = w._rawArgs;
-								w._rawArgs = rawArgs;
-
-								/*
-									Call the handler.
-
-									NOTE: There's no catch clause here because this try/finally exists solely
-									to ensure that the previous raw arguments string is properly restored in
-									the event that an uncaught exception is thrown during the handler call.
-								*/
-								try {
-									macro.handler(w.output, name, args, w, payload);
-								}
-								finally {
-									w._rawArgs = prevRawArgs;
+									Perflog.logWidgetEnd(name);
 								}
 							}
 						}

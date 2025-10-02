@@ -99,12 +99,30 @@ function niceround(x) {
 	return Math.round(x * 10) / 10;
 }
 
+// Exclude built-in macros from reports
+const perflogInternalMacros = new Set([
+	'__perflog_logWidgetEnd',
+	'capture','set','unset','remember','forget','run',
+	'script','include','display','nobr','print','=','-','silently','type',
+	'if','switch','for','break','continue',
+	'button','link','checkbox','cycle','listbox','option','optionsfrom',
+	'linkappend','linkprepend','linkreplace','numberbox','textbox','radiobutton','textarea',
+	'widget','exit','exitAll'
+]);
+
 Perflog.report = function (options) {
 	if (!State.variables.debug) {
 		console.warn('Performance logging is disabled due to debug being turned off.');
 		return;
 	}
-	const opts = Object.assign({ sort : 'own', limit : 20, global : true, round : true, filter : null }, options);
+	const opts = Object.assign({
+		sort            : 'own',
+		limit           : 20,
+		global          : true,
+		round           : true,
+		filter          : null,
+		excludeInternal : true
+	}, options);
 	const numfn = opts.round ? niceround : function (x) { return x; };
 	let entries;
 	if (opts.global) {
@@ -134,6 +152,9 @@ Perflog.report = function (options) {
 	if (opts.filter) {
 		const matcher = new RegExp(opts.filter);
 		entries = entries.filter(x => typeof x.name === 'string' && matcher.test(x.name));
+	}
+	if (opts.excludeInternal) {
+		entries = entries.filter(x => typeof x.name !== 'string' || !perflogInternalMacros.has(x.name));
 	}
 	let comparator;
 	const sort = opts.sort;
