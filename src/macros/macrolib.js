@@ -7,7 +7,7 @@
 
 ***********************************************************************************************************************/
 /*
-	global Perflog, Config, DebugView, Engine, Has, L10n, Macro, NodeTyper, Patterns, Scripting, SimpleAudio, State,
+	global Config, DebugView, Engine, Has, L10n, Macro, NodeTyper, Patterns, Scripting, SimpleAudio, State,
 	       Story, TempState, Util, Wikifier, postdisplay, prehistory, storage, stringFrom, Links
 */
 
@@ -3866,7 +3866,6 @@
 					isWidget : true,
 					handler  : (function (widgetCode) {
 						return function () {
-							Perflog.logWidgetStart(widgetName);
 							State.pushLocal();
 							const shadowStore = {};
 
@@ -3954,7 +3953,6 @@
 								}
 
 								State.popLocal();
-								Perflog.logWidgetEnd(widgetName);
 							}
 						};
 					})(this.payload[0].contents)

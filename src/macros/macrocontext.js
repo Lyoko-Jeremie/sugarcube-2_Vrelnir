@@ -199,6 +199,7 @@ var MacroContext = (() => { // eslint-disable-line no-unused-vars, no-var
 					const valueCache  = shadowNames.length > 0 ? {} : null;
 					const macroParser = Wikifier.Parser.get('macro');
 					let contextCache;
+					let pushedLocalFrame = false;
 
 					/*
 						There's no catch clause because this try/finally is here simply to ensure that
@@ -206,6 +207,11 @@ var MacroContext = (() => { // eslint-disable-line no-unused-vars, no-var
 						callback.
 					*/
 					try {
+						if (shadowNames.some(name => name.startsWith('$_'))) {
+							State.pushLocal();
+							pushedLocalFrame = true;
+						}
+
 						/*
 							Cache the existing values of the variables to be shadowed and assign the
 							shadow values.
@@ -272,6 +278,10 @@ var MacroContext = (() => { // eslint-disable-line no-unused-vars, no-var
 								delete store[varKey];
 							}
 						});
+
+						if (pushedLocalFrame) {
+							State.popLocal();
+						}
 					}
 				}
 
