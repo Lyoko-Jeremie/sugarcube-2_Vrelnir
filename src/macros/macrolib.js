@@ -3897,7 +3897,7 @@
 								const errList = [];
 
 								// Wikify the widget's code.
-								new Wikifier(resFrag, widgetCode);
+								new Wikifier(resFrag, widgetCode.replace(/^\n+|\n+$/g, '').replace(/\s+/g, ' '));
 
 								// Returns value on <<exit>>
 								if (this.hasOwnProperty('_widgetReturn')) {
