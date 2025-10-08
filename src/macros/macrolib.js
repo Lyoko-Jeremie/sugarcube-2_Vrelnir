@@ -679,7 +679,7 @@
 									$wrapper.addClass(`${className}-cursor`);
 								}
 							}
-								};
+						};
 
 						// Fire the typing start event.
 						$wrapper.trigger(typingStartId);
@@ -1417,80 +1417,102 @@
 
 		handler() {
 			if (this.args.length < 3) {
-				const errors = [];
-				if (this.args.length < 1) { errors.push('variable name'); }
-				if (this.args.length < 2) { errors.push('unchecked value'); }
-				if (this.args.length < 3) { errors.push('checked value'); }
-				return this.error(`no ${errors.join(' or ')} specified`);
+				const missing = [];
+				if (this.args.length < 1) missing.push('variable name');
+				if (this.args.length < 2) missing.push('unchecked value');
+				if (this.args.length < 3) missing.push('checked value');
+				return this.error(`no ${missing.join(' or ')} specified`);
 			}
 
-			// Ensure that the variable name argument is a string.
 			if (typeof this.args[0] !== 'string') {
 				return this.error('variable name argument is not a string');
 			}
-
 			const varName = this.args[0].trim();
-
-			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
 			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
 				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
-			const varId        = Util.slugify(varName);
+			const idName = varName.replace(/\[(\$\S+?)\]/g, (_, keyVar) => {
+				const keyValue = State.getVar(keyVar);
+				return `-${keyValue ?? keyVar}`;
+			});
+			const varId        = Util.slugify(idName);
 			const uncheckValue = this.args[1];
 			const checkValue   = this.args[2];
-			const el           = document.createElement('input');
-			const callbacks = typeof this.args[4] === 'object' && this.args[4] || {};
 
-			/*
-				Set up and append the input element to the output buffer.
-			*/
-			jQuery(el)
+			const opts        = typeof this.args[4] === 'object' && this.args[4] || {};
+			const onToggle    = typeof opts.onToggle === 'function' ? opts.onToggle : null;
+			const group       = typeof opts.group === 'string' && opts.group.trim() ? opts.group.trim() : null;
+			const limit       = Number.isFinite(Number(opts.limit)) ? Number(opts.limit) : null;
+			const tooltipText = typeof opts.tooltip === 'string' && opts.tooltip.trim() ? opts.tooltip.trim() : null;
+
+			const $el = jQuery('<input type="checkbox" tabindex="0">')
 				.attr({
-					id       : `${this.name}-${varId}`,
-					name     : `${this.name}-${varId}`,
-					type     : 'checkbox',
-					tabindex : 0 // for accessiblity
+					id   : `${this.name}-${varId}`,
+					name : `${this.name}-${varId}`
 				})
-				.addClass(`macro-${this.name}`)
-				.on(
-					'change.macros',
-					this.createShadowWrapper(function () {
-						const checked = this.checked;
-						State.setVar(varName, checked ? checkValue : uncheckValue);
+				.addClass(`macro-${this.name}`);
 
-						if (typeof callbacks.onToggle === 'function') {
-							try {
-								callbacks.onToggle(checked);
-							}
-							catch (err) {
-								console.error('checkbox onToggle error:', err);
-							}
-						}
-					})
-				)
-				.appendTo(this.output);
+			if (group)            $el.attr('data-limit-group', group);
+			if (limit !== null)   $el.attr('data-limit-threshold', String(limit));
+			if (tooltipText) {
+				$el.attr('data-tooltip-message', tooltipText).attr('title', ''); // native title as fallback
+				if ($.fn.tooltip) $el.tooltip({ message : tooltipText, cursor : null }).tooltip('disable');
+			}
 
-			/*
-				Set the variable and input element to the appropriate value and state, as requested.
-			*/
+			const enforceGroup = () => {
+				if (!group) return;
+				const $boxes      = $(`[data-limit-group="${group}"]`);
+				const threshold   = Number.isFinite(limit)
+					? limit
+					: Number($boxes.first().attr('data-limit-threshold')) || Infinity;
+				const checkedCnt  = $boxes.filter(':checked').length;
+
+				$boxes.each(function () {
+					const $box = $(this);
+					const disable = !$box.prop('checked') && checkedCnt >= threshold;
+					$box.prop('disabled', disable).attr('aria-disabled', disable);
+					const msg = $box.attr('data-tooltip-message');
+					if (msg) {
+						if ($.fn.tooltip) $box.tooltip(disable ? 'enable' : 'disable');
+						$box.attr('title', disable ? msg : '');
+						$box.css('cursor', disable ? 'not-allowed' : '');
+					}
+				});
+			};
+
+			$el.on('change.macros', this.createShadowWrapper(function () {
+				const checked = this.checked;
+				State.setVar(varName, checked ? checkValue : uncheckValue);
+
+				if (onToggle) {
+					try { onToggle(checked); }
+					catch (err) { console.error('checkbox onToggle error:', err); }
+				}
+
+				enforceGroup();
+			}));
+
+			$el.appendTo(this.output);
+
 			switch (this.args[3]) {
 			case 'autocheck':
 				if (State.getVar(varName) === checkValue) {
-					el.checked = true;
-				}
-				else {
+					$el.prop('checked', true);
+				} else {
 					State.setVar(varName, uncheckValue);
 				}
 				break;
 			case 'checked':
-				el.checked = true;
+				$el.prop('checked', true);
 				State.setVar(varName, checkValue);
 				break;
 			default:
 				State.setVar(varName, uncheckValue);
 				break;
 			}
+
+			enforceGroup();
 		}
 	});
 
