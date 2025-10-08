@@ -1440,6 +1440,7 @@
 			const uncheckValue = this.args[1];
 			const checkValue   = this.args[2];
 			const el           = document.createElement('input');
+			const callbacks = typeof this.args[4] === 'object' && this.args[4] || {};
 
 			/*
 				Set up and append the input element to the output buffer.
@@ -1452,9 +1453,22 @@
 					tabindex : 0 // for accessiblity
 				})
 				.addClass(`macro-${this.name}`)
-				.on('change.macros', this.createShadowWrapper(function () {
-					State.setVar(varName, this.checked ? checkValue : uncheckValue);
-				}))
+				.on(
+					'change.macros',
+					this.createShadowWrapper(function () {
+						const checked = this.checked;
+						State.setVar(varName, checked ? checkValue : uncheckValue);
+
+						if (typeof callbacks.onToggle === 'function') {
+							try {
+								callbacks.onToggle(checked);
+							}
+							catch (err) {
+								console.error('checkbox onToggle error:', err);
+							}
+						}
+					})
+				)
 				.appendTo(this.output);
 
 			/*
