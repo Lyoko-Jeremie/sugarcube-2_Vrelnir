@@ -1417,81 +1417,112 @@
 
 		handler() {
 			if (this.args.length < 3) {
-				const missing = [];
-				if (this.args.length < 1) missing.push('variable name');
-				if (this.args.length < 2) missing.push('unchecked value');
-				if (this.args.length < 3) missing.push('checked value');
-				return this.error(`no ${missing.join(' or ')} specified`);
+				const errors = [];
+				if (this.args.length < 1) errors.push('variable name');
+				if (this.args.length < 2) errors.push('unchecked value');
+				if (this.args.length < 3) errors.push('checked value');
+				return this.error(`no ${errors.join(' or ')} specified`);
 			}
-
 			if (typeof this.args[0] !== 'string') {
 				return this.error('variable name argument is not a string');
 			}
+
 			const varName = this.args[0].trim();
 			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
 				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
-			const idName = varName.replace(/\[(\$\S+?)\]/g, (_, keyVar) => {
-				const keyValue = State.getVar(keyVar);
-				return `-${keyValue ?? keyVar}`;
+			const idName = varName.replace(/\[(\$\S+)\]/g, (_, keyVar) => {
+				const keyValue = State.getVar(keyVar) ?? keyVar;
+				return `-${keyValue}`;
 			});
-			const varId        = Util.slugify(idName);
+			const varId = Util.slugify(idName);
 			const uncheckValue = this.args[1];
-			const checkValue   = this.args[2];
+			const checkValue = this.args[2];
 
-			const opts        = typeof this.args[4] === 'object' && this.args[4] || {};
-			const onToggle    = typeof opts.onToggle === 'function' ? opts.onToggle : null;
-			const group       = typeof opts.group === 'string' && opts.group.trim() ? opts.group.trim() : null;
-			const limit       = Number.isFinite(Number(opts.limit)) ? Number(opts.limit) : null;
-			const tooltipText = typeof opts.tooltip === 'string' && opts.tooltip.trim() ? opts.tooltip.trim() : null;
+			let group = null;
+			let limit = null;
+			let tooltipMessage = null;
+			let callbacks = {};
+
+			const arg4 = this.args[4];
+
+			if (typeof arg4 === 'object' && arg4 !== null && (arg4.onToggle || Object.keys(arg4).length > 0)) {
+				callbacks = arg4;
+			} else {
+				group = typeof arg4 === 'string' && arg4.trim() ? arg4.trim() : null;
+				limit = Number.isFinite(Number(this.args[5])) ? Number(this.args[5]) : null;
+				tooltipMessage = typeof this.args[6] === 'string' && this.args[6].trim() ? this.args[6].trim() : null;
+				if (typeof this.args[7] === 'object' && this.args[7] !== null) {
+					callbacks = this.args[7];
+				}
+			}
+
+			const onToggle = typeof callbacks.onToggle === 'function' ? callbacks.onToggle : null;
 
 			const $el = jQuery('<input type="checkbox" tabindex="0">')
 				.attr({
-					id   : `${this.name}-${varId}`,
-					name : `${this.name}-${varId}`
+					id       : `${this.name}-${varId}`,
+					name     : `${this.name}-${varId}`,
+					type     : 'checkbox',
+					tabindex : 0
 				})
 				.addClass(`macro-${this.name}`);
 
-			if (group)            $el.attr('data-limit-group', group);
-			if (limit !== null)   $el.attr('data-limit-threshold', String(limit));
-			if (tooltipText) {
-				$el.attr('data-tooltip-message', tooltipText).attr('title', ''); // native title as fallback
-				if ($.fn.tooltip) $el.tooltip({ message : tooltipText, cursor : null }).tooltip('disable');
+			if (group) $el.attr('data-limit-group', group);
+			if (limit !== null) $el.attr('data-limit-threshold', limit);
+			if (tooltipMessage) {
+				$el.attr('data-tooltip-message', tooltipMessage);
+				if ($.fn.tooltip) {
+					$el.tooltip({ message : tooltipMessage, cursor : null }).tooltip('disable');
+				}
 			}
 
-			const enforceGroup = () => {
+			const enforceGroup = triggerEl => {
 				if (!group) return;
-				const $boxes      = $(`[data-limit-group="${group}"]`);
-				const threshold   = Number.isFinite(limit)
-					? limit
-					: Number($boxes.first().attr('data-limit-threshold')) || Infinity;
-				const checkedCnt  = $boxes.filter(':checked').length;
+				const $boxes = $(`[data-limit-group="${group}"]`);
+				const checkedCount = $boxes.filter(':checked').length;
+
+				let threshold;
+				if (triggerEl) {
+					const raw = $(triggerEl).data('limit-threshold');
+					threshold = raw != null && Number.isFinite(Number(raw)) ? Number(raw) : $boxes.length;
+				} else {
+					const $withLimit = $boxes.filter((_, el) => Number.isFinite(Number($(el).data('limit-threshold')))).first();
+					threshold = $withLimit.length ? Number($withLimit.data('limit-threshold')) : $boxes.length;
+				}
 
 				$boxes.each(function () {
 					const $box = $(this);
-					const disable = !$box.prop('checked') && checkedCnt >= threshold;
-					$box.prop('disabled', disable).attr('aria-disabled', disable);
-					const msg = $box.attr('data-tooltip-message');
+					const disable = !$box.prop('checked') && checkedCount >= threshold;
+					$box.prop('disabled', disable);
+
+					const msg = $box.data('tooltip-message');
 					if (msg) {
 						if ($.fn.tooltip) $box.tooltip(disable ? 'enable' : 'disable');
-						$box.attr('title', disable ? msg : '');
-						$box.css('cursor', disable ? 'not-allowed' : '');
+						$box.css('cursor', disable ? 'pointer' : '');
 					}
 				});
 			};
 
-			$el.on('change.macros', this.createShadowWrapper(function () {
-				const checked = this.checked;
-				State.setVar(varName, checked ? checkValue : uncheckValue);
+			$el.on(
+				'change.macros',
+				this.createShadowWrapper(function () {
+					const checked = this.checked;
+					State.setVar(varName, checked ? checkValue : uncheckValue);
 
-				if (onToggle) {
-					try { onToggle(checked); }
-					catch (err) { console.error('checkbox onToggle error:', err); }
-				}
+					if (onToggle) {
+						try {
+							onToggle(checked);
+						}
+						catch (err) {
+							console.error('checkbox onToggle error:', err);
+						}
+					}
 
-				enforceGroup();
-			}));
+					enforceGroup(this);
+				})
+			);
 
 			$el.appendTo(this.output);
 
@@ -1512,7 +1543,7 @@
 				break;
 			}
 
-			enforceGroup();
+			enforceGroup($el[0]);
 		}
 	});
 
