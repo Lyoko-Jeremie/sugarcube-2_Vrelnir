@@ -1067,13 +1067,14 @@
 					}
 				}
 
-				const isStatic = !new RegExp(`(?:(${Patterns.variable})|<<|\\$\{)`).test(payload);
+				const isStatic = !new RegExp(`(?:(${Patterns.variable})|<<|\\$\\{)`).test(payload);
 				const basePayload = payload.replace(/^\n/, '');
-				let staticFrag = null;
+				let staticWrapper = null;
 
 				if (isStatic) {
-					staticFrag = document.createDocumentFragment();
-					new Wikifier(staticFrag, basePayload);
+					const containerTag = this.output && this.output.tagName ? this.output.tagName : 'div';
+					staticWrapper = document.createElement(containerTag);
+					new Wikifier(staticWrapper, basePayload);
 				}
 
 				const conditionEval = compiledCondition ? compiledCondition : () => evalJavaScript(condition);
@@ -1090,13 +1091,13 @@
 					}
 
 					if (isStatic) {
-						this.output.appendChild(staticFrag.cloneNode(true));
+						const frag = document.createDocumentFragment();
+						staticWrapper.childNodes.forEach(node => frag.appendChild(node.cloneNode(true)));
+						this.output.appendChild(frag);
 					}
 					else {
 						const wikifySource = first ? basePayload : payload;
-						const frag = document.createDocumentFragment();
-						new Wikifier(frag, wikifySource);
-						this.output.appendChild(frag);
+						new Wikifier(this.output, wikifySource);
 					}
 
 					if (first) {
@@ -1152,11 +1153,12 @@
 				}
 				const isStatic = !(new RegExp(Patterns.variable).test(payload) || payload.indexOf('<<') !== -1 || payload.indexOf('${') !== -1);
 				const baseSource = payload.replace(/^\n/, '');
-				let staticFrag = null;
+				let staticWrapper = null;
 
 				if (isStatic) {
-					staticFrag = document.createDocumentFragment();
-					new Wikifier(staticFrag, baseSource);
+					const containerTag = this.output && this.output.tagName ? this.output.tagName : 'div';
+					staticWrapper = document.createElement(containerTag);
+					new Wikifier(staticWrapper, baseSource);
 				}
 
 				const renderBody = (idx, val) => {
@@ -1167,12 +1169,12 @@
 					State[valueVar.type][valueVar.name] = val;
 
 					if (isStatic) {
-						this.output.appendChild(staticFrag.cloneNode(true));
+						const frag = document.createDocumentFragment();
+						staticWrapper.childNodes.forEach(node => frag.appendChild(node.cloneNode(true)));
+						this.output.appendChild(frag);
 					}
 					else {
-						const frag = document.createDocumentFragment();
-						new Wikifier(frag, first ? baseSource : payload);
-						this.output.appendChild(frag);
+						new Wikifier(this.output, first ? baseSource : payload);
 					}
 				};
 
