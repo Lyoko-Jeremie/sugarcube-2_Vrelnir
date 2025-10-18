@@ -2312,6 +2312,7 @@
 			if (this.name !== 'back' || momentIndex !== -1) {
 				$link = jQuery(document.createElement('a'))
 					.addClass('link-internal')
+					.each(() => { Engine.flags.noValidLinks = false; })
 					.ariaClick(
 						{ one : true },
 						this.name === 'return'

@@ -39,6 +39,9 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 	// List of objects describing `StoryInterface` elements to update via passages during navigation.
 	let _updating = null;
 
+	// Runtime flags
+	const _flags = { noValidLinks : true };
+
 
 	/*******************************************************************************************************************
 		Engine Functions.
@@ -449,6 +452,12 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 	function enginePlay(title, noHistory) {
 		if (DEBUG) { console.log(`[Engine/enginePlay(title: "${title}", noHistory: ${noHistory})]`); }
 
+		// Remember current passage and Y scroll
+		const _prevPassageTitle = State.passage;
+		const _savedScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+
+		_flags.noValidLinks = true;
+
 		let passageTitle = title;
 
 		// Update the engine state.
@@ -659,8 +668,13 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 			document.title = `${passage.title} | ${Story.title}`;
 		}
 
-		// Scroll the window to the top.
-		window.scroll(0, 0);
+		// Restore scroll position if the passage isn't changed
+		if (_prevPassageTitle === passage.title) {
+			requestAnimationFrame(() => window.scrollTo(0, _savedScrollY || 0));
+		}
+		else {
+			window.scroll(0, 0);
+		}
 
 		// Update the engine state.
 		_state = States.Playing;
@@ -854,6 +868,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		forward     : { value : engineForward },
 		show        : { value : engineShow },
 		play        : { value : enginePlay },
+		flags       : { value : _flags },
 
 		/*
 			Legacy Functions.
