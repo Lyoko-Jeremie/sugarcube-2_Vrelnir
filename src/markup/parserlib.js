@@ -785,7 +785,7 @@
 		handler(w) {
 			const markup = Wikifier.helpers.parseSquareBracketedMarkup(w);
 
-			if (markup.hasOwnProperty('error')) {
+			if (Object.hasOwn(markup, 'error')) {
 				w.outputText(w.output, w.matchStart, w.nextMatch);
 				return;
 			}
@@ -794,14 +794,12 @@
 
 			// text=(text), forceInternal=(~), link=link, setter=(setter)
 			const link  = Wikifier.helpers.evalPassageId(markup.link);
-			const text  = markup.hasOwnProperty('text') ? Wikifier.helpers.evalText(markup.text) : link;
-			const setFn = markup.hasOwnProperty('setter')
-				? Wikifier.helpers.createShadowSetterCallback(Scripting.parse(markup.setter))
-				: null;
+			const text = Object.hasOwn(markup, 'text') ? Wikifier.wikifyEval(markup.text).textContent : link;
+			const setFn = Object.hasOwn(markup, 'setter') ? Wikifier.helpers.createShadowSetterCallback(Scripting.parse(markup.setter)) : null;
 
 			// Debug view setup.
 			const output = (Config.debug
-				? new DebugView(w.output, 'link-markup', '[[link]]', w.source.slice(w.matchStart, w.nextMatch))
+				? new DebugView(w.output, 'link-markup', '[[Link]]', w.source.slice(w.matchStart, w.nextMatch))
 				: w
 			).output;
 
