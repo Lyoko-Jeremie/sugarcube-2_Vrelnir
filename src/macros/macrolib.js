@@ -4049,16 +4049,16 @@
 		<<exit>> & <<exitAll>>
 	*/
 	Macro.add(['exit', 'exitAll'], {
+		skipArgs : true,
 		handler() {
 			if (this.name === 'exit' && this.args && this.args.full && this.args.full.length > 0) {
 				try {
-					const result = stringFrom(Scripting.evalJavaScript(this.args.full));
-					if (result !== null) {
-						// Find nearest widget context
-						const widgetCtx = this.contextSelect(ctx => ctx.self && ctx.self.isWidget);
-						if (widgetCtx) {
-							widgetCtx._widgetReturn = result;
-						}
+					const normalized = (stringFrom(Scripting.evalJavaScript(this.args.full)) ?? '').replace('[undefined]', '');
+					
+					// Find nearest widget context
+					const widgetCtx = this.contextSelect(ctx => ctx.self && ctx.self.isWidget);
+					if (widgetCtx) {
+						widgetCtx._widgetReturn = normalized;
 					}
 				}
 				catch (ex) {
