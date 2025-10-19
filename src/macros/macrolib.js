@@ -1326,9 +1326,9 @@
 		Interactive Macros.
 	*******************************************************************************************************************/
 	/*
-		<<button>> & <<link>>
+		<<button>> & <<link>> & <<here>>
 	*/
-	Macro.add(['button', 'link'], {
+	Macro.add(['button', 'link', 'here'], {
 		isAsync : true,
 		tags    : null,
 
@@ -1342,56 +1342,46 @@
 
 			if (typeof this.args[0] === 'object') {
 				if (this.args[0].isImage) {
-					// Argument was in wiki image syntax.
-					const $image = jQuery(document.createElement('img'))
-						.attr('src', this.args[0].source)
-						.appendTo($link);
-
-					$link.addClass('link-image');
-
-					if (this.args[0].hasOwnProperty('passage')) {
-						$image.attr('data-passage', this.args[0].passage);
-					}
-
-					if (this.args[0].hasOwnProperty('title')) {
-						$image.attr('title', this.args[0].title);
-					}
-
-					if (this.args[0].hasOwnProperty('align')) {
-						$image.attr('align', this.args[0].align);
-					}
-
+					const $image = $('<img>').attr('src', this.args[0].source).appendTo($link);
+					['passage', 'title', 'align'].forEach(attr => {
+						if (Object.hasOwn(this.args[0], attr)) {
+							$image.attr(attr, this.args[0][attr]);
+						}
+					});
 					passage = this.args[0].link;
-				}
-				else {
-					// Argument was in wiki link syntax.
-					$link.append(document.createTextNode(this.args[0].text));
+				} else {
+					$link.append(document.createTextNode(Wikifier.wikifyEval(this.args[0].text).textContent));
 					passage = this.args[0].link;
 				}
 			}
-			else {
-				// Argument was simply the link text.
+			 else {
 				$link.wikiWithOptions({ profile : 'core' }, this.args[0]);
-				passage = this.args.length > 1 ? this.args[1] : undefined;
+				passage = this.args[1];
 			}
 
-			if (passage != null) { // lazy equality for null
-				$link.attr('data-passage', passage);
+			// <<here>> macro
+			if (this.name === 'here') {
+				passage = State.passage;
+				if (typeof this.args[0] !== 'object' && typeof this.args[1] === 'string' && Story.has(this.args[1])) {
+					this.args.splice(1, 1);
+				}
+			}
 
+			if (passage) {
+				$link.attr('data-passage', passage).addClass(Story.has(passage) ? 'link-internal' : 'link-broken');
 				if (Story.has(passage)) {
-					$link.addClass('link-internal');
-
+					Engine.flags.noValidLinks = false;
 					if (Config.addVisitedLinkClass && State.hasPlayed(passage)) {
 						$link.addClass('link-visited');
 					}
-				}
-				else {
-					$link.addClass('link-broken');
 				}
 			}
 			else {
 				$link.addClass('link-internal');
 			}
+
+
+			Macro.hooks.emit('link:beforeAppend', { macro : this, $link, args : this.args });
 
 			$link
 				.addClass(`macro-${this.name}`)
@@ -1404,10 +1394,15 @@
 						? () => Wikifier.wikifyEval(this.payload[0].contents.trim())
 						: null,
 					passage != null // lazy equality for null
-						? () => Engine.play(passage)
+						? () => {
+							Macro.hooks.emit('link:beforePlay', { macro : this, $link, args : this.args, output : this.output, passage });
+							Engine.play(passage);
+						}
 						: null
 				))
 				.appendTo(this.output);
+
+			Macro.hooks.emit('link:afterAppend', { macro : this, $link, args : this.args, output : this.output, passage });
 		}
 	});
 
@@ -2311,6 +2306,7 @@
 			if (this.name !== 'back' || momentIndex !== -1) {
 				$link = jQuery(document.createElement('a'))
 					.addClass('link-internal')
+					.each(() => { Engine.flags.noValidLinks = false; })
 					.ariaClick(
 						{ one : true },
 						this.name === 'return'
@@ -4047,16 +4043,16 @@
 		<<exit>> & <<exitAll>>
 	*/
 	Macro.add(['exit', 'exitAll'], {
+		skipArgs : true,
 		handler() {
 			if (this.name === 'exit' && this.args && this.args.full && this.args.full.length > 0) {
 				try {
-					const result = stringFrom(Scripting.evalJavaScript(this.args.full));
-					if (result !== null) {
-						// Find nearest widget context
-						const widgetCtx = this.contextSelect(ctx => ctx.self && ctx.self.isWidget);
-						if (widgetCtx) {
-							widgetCtx._widgetReturn = result;
-						}
+					const normalized = (stringFrom(Scripting.evalJavaScript(this.args.full)) ?? '').replace('[undefined]', '');
+					
+					// Find nearest widget context
+					const widgetCtx = this.contextSelect(ctx => ctx.self && ctx.self.isWidget);
+					if (widgetCtx) {
+						widgetCtx._widgetReturn = normalized;
 					}
 				}
 				catch (ex) {

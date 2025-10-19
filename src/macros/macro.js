@@ -14,6 +14,36 @@ var Macro = (() => { // eslint-disable-line no-unused-vars, no-var
 	// Macro definitions.
 	const _macros = {};
 
+	// Simple hook registry for macro extension points.
+	const _hooks = Object.create(null);
+
+	function hooksOn(event, fn) {
+		if (typeof event !== 'string' || !event || typeof fn !== 'function') {
+			throw new Error('Macro.hooks.on: invalid usage');
+		}
+		(_hooks[event] ??= []).push(fn);
+	}
+
+	function hooksOff(event, fn) {
+		if (!event || typeof event !== 'string') throw new Error('hooksOff: event must be a non-empty string');
+		const list = _hooks[event];
+		if (!list) return;
+		if (fn) {
+			const i = list.indexOf(fn);
+			if (i !== -1) list.splice(i, 1);
+			if (!list.length) delete _hooks[event];
+		} else {
+			delete _hooks[event];
+		}
+	}
+
+	function hooksEmit(event, payload) {
+		for (const fn of _hooks[event] ?? []) {
+			try { fn(payload); }
+			catch { /* ignore errors */ }
+		}
+	}
+
 	// Map of all macro tags and their parents (key: 'tag name' => value: ['list of parent names']).
 	const _tags = {};
 
@@ -227,6 +257,9 @@ var Macro = (() => { // eslint-disable-line no-unused-vars, no-var
 		has     : { value : macrosHas },
 		get     : { value : macrosGet },
 		init    : { value : macrosInit },
+
+		// Hook API
+		hooks : { value : Object.freeze({ on : hooksOn, off : hooksOff, emit : hooksEmit }) },
 
 		/*
 			Tags Functions.
