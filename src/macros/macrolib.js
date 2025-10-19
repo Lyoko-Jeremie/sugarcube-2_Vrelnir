@@ -1423,7 +1423,6 @@
 			if (typeof this.args[0] !== 'string') {
 				return this.error('variable name argument is not a string');
 			}
-
 			const varName = this.args[0].trim();
 			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
 				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
