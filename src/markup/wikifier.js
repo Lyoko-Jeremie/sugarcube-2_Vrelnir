@@ -21,106 +21,17 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 	// Wikifier call depth.
 	let _callDepth = 0;
 
-	// the last passageTitle
-	let _passageTitleLast = '';
-	// the last passageObjLast
-	// eslint-disable-next-line no-undef-init
-	let _passageObjLast = undefined;
-
-	/**
-	 * @type { { passageObj?: Passage , passageTitle: String , source?: string , macroThis?: MacroContext  }[] }
-	 * @private
-	 */
-	let _lastPassageQ = [];
 
 	/*******************************************************************************************************************
 		Wikifier Class.
 	*******************************************************************************************************************/
 	class Wikifier {
-		constructor(destination, source, options, passageObj, passageTitle) {
-			// if (!passageObj && !passageTitle) {
-			// 	console.error('Wikifier.constructor(): No passage title.', passageObj, passageTitle, [source]/* , (new Error()).stack */);
-			// }
-
-			if (_callDepth === 0) {
-				_passageTitleLast = passageObj ? passageObj.title : passageTitle;
-				_passageObjLast = passageObj;
-				if (_lastPassageQ.length !== 0) {
-					console.error('Wikifier constructor(): _callDepth === 0, but _lastPassageQ is not empty.', _lastPassageQ);
-				}
-				_lastPassageQ = [];
-				_lastPassageQ.push({ passageObj : _passageObjLast, passageTitle : _passageTitleLast, source });
-				// before passage hook
-				if (typeof window.modSC2DataManager !== 'undefined' &&
-					window.modSC2DataManager.getWikifyTracer?.().beforePassage
-				) {
-					// eslint-disable-next-line no-param-reassign
-					source = window.modSC2DataManager.getWikifyTracer().beforePassage(source, _passageTitleLast, _passageObjLast);
-				}
-			}
-			else {
-				if (passageObj || passageTitle) {
-					_passageTitleLast = passageObj ? passageObj.title : passageTitle;
-					_passageObjLast = passageObj;
-					_lastPassageQ.push({ passageObj, passageTitle, source });
-				}
-				else {
-					const lp = _lastPassageQ.last();
-					_passageTitleLast = lp.passageTitle;
-					_passageObjLast = lp.passageObj;
-					_lastPassageQ.push({ _passageObjLast, _passageTitleLast, source });
-				}
-			}
-
-			// eslint-disable-next-line no-undef
-			if (typeof i18nManager !== 'undefined') {
-				let name = passageObj ? passageObj.title : passageTitle;
-				// eslint-disable-next-line no-nested-ternary
-				name = name ? (_passageObjLast ? _passageObjLast.title : undefined) : undefined;
-
-				const lppt = Wikifier.getLastPossiblePassageTitle();
-				if (!name && !_passageTitleLast && !lppt) {
-					// eslint-disable-next-line no-undef
-					console.warn('Wikifier.constructor(): No name.', [name, _callDepth, structuredClone(_lastPassageQ), _passageTitleLast, structuredClone(_passageObjLast), passageObj, passageTitle, lppt]);
-				}
-
-				// eslint-disable-next-line no-undef,no-param-reassign
-				source = i18nManager.typeB.replaceInputStoryScript(source, name, _passageTitleLast, lppt);
-			}
-			if (false) {
-				// test
-				let name = passageObj ? passageObj.title : passageTitle;
-				// eslint-disable-next-line no-nested-ternary
-				name = name ? (_passageObjLast ? _passageObjLast.title : undefined) : undefined;
-
-				const lppt = Wikifier.getLastPossiblePassageTitle();
-				if (!name && !_passageTitleLast && !lppt) {
-					// eslint-disable-next-line no-undef
-					console.warn('Wikifier.constructor(): No name.', [name, _callDepth, structuredClone(_lastPassageQ), _passageTitleLast, structuredClone(_passageObjLast), passageObj, passageTitle, lppt]);
-				}
-
-				// eslint-disable-next-line no-undef,no-param-reassign
-				console.log('[source, _callDepth, _lastPassageQ, name, _passageTitleLast, lppt]', [source, _callDepth, structuredClone(_lastPassageQ), name, _passageTitleLast, lppt]);
-			}
+		constructor(destination, source, options) {
 			if (Wikifier.Parser.Profile.isEmpty()) {
 				Wikifier.Parser.Profile.compile();
 			}
 
-			// before any level hook
-			if (typeof window.modSC2DataManager !== 'undefined' &&
-				window.modSC2DataManager.getWikifyTracer?.().beforeWikify
-			) {
-				// eslint-disable-next-line no-param-reassign
-				source = window.modSC2DataManager.getWikifyTracer().beforeWikify(source);
-			}
-
 			Object.defineProperties(this, {
-				passageObj : {
-					writable : true,
-					// if no passageObj (often case by user call wikifyEval()), create a mook passageObj with title
-					value    : passageObj || { title : passageTitle }
-				},
-
 				// General Wikifier properties.
 				source : {
 					value : String(source)
@@ -176,7 +87,7 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 			try {
 				++_callDepth;
 
-				this.subWikify(this.output, undefined, undefined, passageObj);
+				this.subWikify(this.output);
 
 				// Limit line break conversion to non-recursive calls.
 				if (_callDepth === 1 && Config.cleanupWikifierOutput) {
@@ -185,71 +96,10 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 			}
 			finally {
 				--_callDepth;
-
-				// after any level hook
-				if (typeof window.modSC2DataManager !== 'undefined') {
-					window.modSC2DataManager.getWikifyTracer?.()?.afterWikify?.(source, this.output);
-				}
-
-				const lp = _lastPassageQ.pop();
-				_passageTitleLast = lp.passageTitle;
-				_passageObjLast = lp.passageObj;
-
-				if (_callDepth === 0) {
-					// after passage hook
-					if (typeof window.modSC2DataManager !== 'undefined') {
-						window.modSC2DataManager.getWikifyTracer?.()?.afterPassage?.(source, _passageTitleLast, _passageObjLast, this.output);
-					}
-					_passageTitleLast = '';
-					_passageObjLast = undefined;
-					if (_lastPassageQ.length !== 0) {
-						console.error('Wikifier constructor(): finally(_callDepth === 0) _lastPassageQ is not empty.', _lastPassageQ);
-					}
-					_lastPassageQ = [];
-				}
 			}
 		}
 
-		static lastPassageQPush(passageObj, passageTitle, source, macroThis) {
-			// console.log('lastPassageQPush', [passageObj, passageTitle, source, macroThis, structuredClone(macroThis), structuredClone(_lastPassageQ)]);
-			_lastPassageQ.push({ passageObj, passageTitle, source, macroThis : macroThis });
-			// before push
-			return _lastPassageQ.length - 1;
-		}
-
-		static lastPassageQPop() {
-			_lastPassageQ.pop();
-			return _lastPassageQ.length;
-		}
-
-		static lastPassageQSize() {
-			return _lastPassageQ.length;
-		}
-
-		static lastPassageQFront() {
-			return [_lastPassageQ.length, _lastPassageQ.first()];
-		}
-
-		static lastPassageQBack() {
-			return [_lastPassageQ.length, _lastPassageQ.last()];
-		}
-
-		static getLastPossiblePassageTitle() {
-			for (let i = _lastPassageQ.length - 1; i >= 0; --i) {
-				const nn = _lastPassageQ[i];
-				if (nn && nn.passageTitle) {
-					return nn.passageTitle;
-				}
-			}
-		}
-
-		static getLastPassageQ() {
-			// copy a new array
-			return _lastPassageQ.map(T => T);
-		}
-
-		// eslint-disable-next-line no-unused-vars
-		subWikify(output, terminator, options, passageObj) {
+		subWikify(output, terminator, options) {
 			// Placed at top to prevent any execution
 			if (Wikifier.stopWikify) return;
 
@@ -379,16 +229,6 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 		}
 
 		outputText(destination, startPos, endPos) {
-			// console.log('outputText():source', this.source);
-			// console.log('outputText():Text', this.source.substring(startPos, endPos));
-			// eslint-disable-next-line no-undef
-			// if (typeof i18nManager !== 'undefined') {
-			// 	// eslint-disable-next-line no-undef
-			// 	const os = i18nManager.typeB.replaceOutputText(this.source.substring(startPos, endPos));
-			// 	jQuery(destination).append(document.createTextNode(os));
-			// 	return;
-			// }
-			// jQuery(destination).append(document.createTextNode(this.source.substring(startPos, endPos)));
 			destination.appendChild(document.createTextNode(this.source.substring(startPos, endPos)));
 		}
 
@@ -408,24 +248,13 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 			return Scripting.parse(this._rawArgs);
 		}
 
-		static getPassageTitleLast() {
-			return _passageTitleLast;
-		}
-
-		static getPassageObjLast() {
-			return _passageObjLast;
-		}
-
 		/*
 			Returns the output generated by wikifying the given text, throwing if there were errors.
 		*/
-		static wikifyEval(text, passageObj, passageTitle) {
-			// if (!passageObj && !passageTitle) {
-			// 	console.error('Wikifier.wikifyEval(): No passage title.', passageObj, passageTitle, [text], (new Error()).stack);
-			// }
+		static wikifyEval(text) {
 			const output = document.createDocumentFragment();
 
-			new Wikifier(output, text, undefined, passageObj, passageTitle);
+			new Wikifier(output, text);
 
 			const errors = output.querySelector('.error');
 
@@ -964,8 +793,17 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 					const shadowStore = {};
 
 					getMacroContextShadowView().forEach(varName => {
-						const varKey = varName.slice(1);
-						const store  = varName[0] === '$' ? State.variables : State.temporary;
+						const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+						let store;
+						if (varName.startsWith('$_')) {
+							store = State.local;
+						}
+						else if (varName[0] === '$') {
+							store = State.variables;
+						}
+						else {
+							store = State.temporary;
+						}
 						shadowStore[varName] = store[varKey];
 					});
 
@@ -984,8 +822,17 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 								shadow values.
 							*/
 							shadowNames.forEach(varName => {
-								const varKey = varName.slice(1);
-								const store  = varName[0] === '$' ? State.variables : State.temporary;
+								const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+								let store;
+								if (varName.startsWith('$_')) {
+									store = State.local;
+								}
+								else if (varName[0] === '$') {
+									store = State.variables;
+								}
+								else {
+									store = State.temporary;
+								}
 
 								if (store.hasOwnProperty(varKey)) {
 									valueCache[varKey] = store[varKey];
@@ -1000,8 +847,17 @@ var Wikifier = (() => { // eslint-disable-line no-unused-vars, no-var
 						finally {
 							// Revert the variable shadowing.
 							shadowNames.forEach(varName => {
-								const varKey = varName.slice(1);
-								const store  = varName[0] === '$' ? State.variables : State.temporary;
+								const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+								let store;
+								if (varName.startsWith('$_')) {
+									store = State.local;
+								}
+								else if (varName[0] === '$') {
+									store = State.variables;
+								}
+								else {
+									store = State.temporary;
+								}
 
 								/*
 									Update the shadow store with the variable's current value, in case it

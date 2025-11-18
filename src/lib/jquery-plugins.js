@@ -43,10 +43,6 @@
 		return function () {
 			const $this = jQuery(this);
 
-			const dataPassage = $this.attr('data-passage');
-			const initialDataPassage = window && window.SugarCube && window.SugarCube.State && window.SugarCube.State.passage;
-			const savedYOffset = window.pageYOffset;
-
 			// Toggle "aria-pressed" status, if the attribute exists.
 			if ($this.is('[aria-pressed]')) {
 				$this.attr('aria-pressed', $this.attr('aria-pressed') === 'true' ? 'false' : 'true');

@@ -8,7 +8,7 @@
 ***********************************************************************************************************************/
 /*
 	global Config, DebugView, Engine, Has, L10n, Macro, NodeTyper, Patterns, Scripting, SimpleAudio, State,
-	       Story, TempState, Util, Wikifier, postdisplay, prehistory, storage, stringFrom
+	       Story, TempState, Util, Wikifier, postdisplay, prehistory, storage, stringFrom, Links
 */
 
 (() => {
@@ -46,8 +46,17 @@
 				*/
 				while ((match = tsVarRe.exec(this.args.raw)) !== null) {
 					const varName = match[1];
-					const varKey  = varName.slice(1);
-					const store   = varName[0] === '$' ? State.variables : State.temporary;
+					const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+					let store;
+					if (varName.startsWith('$_')) {
+						store = State.local;
+					}
+					else if (varName[0] === '$') {
+						store = State.variables;
+					}
+					else {
+						store = State.temporary;
+					}
 
 					if (store.hasOwnProperty(varKey)) {
 						valueCache[varKey] = store[varKey];
@@ -56,18 +65,24 @@
 					this.addShadow(varName);
 				}
 
-				new Wikifier(this.output, this.payload[0].contents, undefined, this.passageObj);
+				new Wikifier(this.output, this.payload[0].contents);
 			}
 			finally {
 				// Revert the variable shadowing.
 				this.shadows.forEach(varName => {
-					const varKey = varName.slice(1);
-					const store  = varName[0] === '$' ? State.variables : State.temporary;
-
-					if (valueCache.hasOwnProperty(varKey)) {
-						store[varKey] = valueCache[varKey];
+					const varKey = varName.slice(varName.startsWith('$_') ? 2 : 1);
+					let store;
+					if (varName.startsWith('$_')) {
+						store = State.local;
 					}
 					else {
+						store = varName[0] === '$' ? State.variables : State.temporary;
+					}
+
+					if (valueCache.hasOwnProperty(varKey)) {
+						if (store) store[varKey] = valueCache[varKey];
+					}
+					else if (store) {
 						delete store[varKey];
 					}
 				});
@@ -90,7 +105,7 @@
 				Scripting.evalJavaScript(this.args.full);
 			}
 			catch (ex) {
-				return this.error(`bad evaluation: ${typeof ex === 'object' ? ex.message : ex}`);
+				return this.error(`bad evaluation: ${typeof ex === 'object' ? `${ex.name}: ${ex.message}` : ex}`, null, ex.stack);
 			}
 
 			// Custom debug view setup.
@@ -325,12 +340,7 @@
 				Wikify the contents, after removing all leading & trailing newlines and compacting
 				all internal sequences of newlines into single spaces.
 			*/
-			new Wikifier(
-				this.output,
-				this.payload[0].contents.replace(/^\n+|\n+$/g, '').replace(/\n+/g, ' '),
-				undefined,
-				this.passageObj
-			);
+			new Wikifier(this.output, this.payload[0].contents.replace(/^\n+|\n+$/g, '').replace(/\n+/g, ' '));
 		}
 	});
 
@@ -349,16 +359,11 @@
 				const result = stringFrom(Scripting.evalJavaScript(this.args.full));
 
 				if (result !== null) {
-					new Wikifier(
-						this.output,
-						this.name === '-' ? Util.escape(result) : result,
-						undefined,
-						this.passageObj
-					);
+					new Wikifier(this.output, this.name === '-' ? Util.escape(result) : result);
 				}
 			}
 			catch (ex) {
-				return this.error(`bad evaluation: ${typeof ex === 'object' ? ex.message : ex}`);
+				return this.error(`bad evaluation: ${typeof ex === 'object' ? `${ex.name}: ${ex.message}` : ex}`, null, ex.stack);
 			}
 		}
 	});
@@ -372,7 +377,7 @@
 
 		handler() {
 			const frag = document.createDocumentFragment();
-			new Wikifier(frag, this.payload[0].contents.trim(), undefined, this.passageObj);
+			new Wikifier(frag, this.payload[0].contents.trim());
 
 			if (Config.debug) {
 				// Custom debug view setup.
@@ -546,7 +551,6 @@
 			// Generate our unique ID.
 			const selfId = ++this.self.typeId;
 
-			const macroThis = this;
 			// Push our typing handler onto the queue.
 			TempState.macroTypeQueue.push({
 				id : selfId,
@@ -566,7 +570,7 @@
 					}
 
 					// Wikify the contents into `$wrapper`.
-					new Wikifier($wrapper, contents, undefined, macroThis.passageObj);
+					new Wikifier($wrapper, contents);
 
 					// Cache info about the current turn.
 					const passage = State.passage;
@@ -785,7 +789,7 @@
 					// Conditional test.
 					if (this.payload[i].name === 'else' || !!evalJavaScript(this.payload[i].args.full)) {
 						success = true;
-						new Wikifier(this.output, this.payload[i].contents, undefined, this.passageObj);
+						new Wikifier(this.output, this.payload[i].contents);
 						break;
 					}
 					else if (Config.debug) {
@@ -823,7 +827,7 @@
 				}
 			}
 			catch (ex) {
-				return this.error(`bad conditional expression in <<${i === 0 ? 'if' : 'elseif'}>> clause${i > 0 ? ' (#' + i + ')' : ''}: ${typeof ex === 'object' ? ex.message : ex}`); // eslint-disable-line prefer-template
+				return this.error(`bad conditional expression in <<${i === 0 ? 'if' : 'elseif'}>> clause${i > 0 ? ' (#' + i + ')' : ''}: ${typeof ex === 'object' ? `${ex.name}: ${ex.message}` : ex}`, null, ex.stack); // eslint-disable-line prefer-template
 			}
 		}
 	});
@@ -903,7 +907,7 @@
 				// Case test(s).
 				if (this.payload[i].name === 'default' || this.payload[i].args.some(val => val === result)) {
 					success = true;
-					new Wikifier(this.output, this.payload[i].contents, undefined, this.passageObj);
+					new Wikifier(this.output, this.payload[i].contents);
 					break;
 				}
 				else if (Config.debug) {
@@ -957,7 +961,7 @@
 		skipArgs    : true,
 		tags        : null,
 		hasRangeRe  : new RegExp(`^\\S${Patterns.anyChar}*?\\s+range\\s+\\S${Patterns.anyChar}*?$`),
-		rangeRe     : new RegExp(`^(?:State\\.(variables|temporary)\\.(${Patterns.identifier})\\s*,\\s*)?State\\.(variables|temporary)\\.(${Patterns.identifier})\\s+range\\s+(\\S${Patterns.anyChar}*?)$`),
+		rangeRe     : new RegExp(`^(?:State\\.(variables|temporary|local)\\.(${Patterns.identifier})\\s*,\\s*)?State\\.(variables|temporary|local)\\.(${Patterns.identifier})\\s+range\\s+(\\S${Patterns.anyChar}*?)$`),
 		threePartRe : /^([^;]*?)\s*;\s*([^;]*?)\s*;\s*([^;]*?)$/,
 		forInRe     : /^\S+\s+in\s+\S+/i,
 		forOfRe     : /^\S+\s+of\s+\S+/i,
@@ -1034,6 +1038,18 @@
 			let first  = true;
 			let safety = Config.macros.maxLoopIterations;
 
+			let compiledInit = null;
+			let compiledCondition = null;
+			let compiledPost = null;
+
+			try {
+				if (init) compiledInit = Scripting.evalJavaScript(`(function(){${Scripting.parse(String(init))}})`);
+				if (condition != null && condition !== true) compiledCondition = Scripting.evalJavaScript(`(function(){return (${Scripting.parse(String(condition))});})`);
+				if (post) compiledPost = Scripting.evalJavaScript(`(function(){${Scripting.parse(String(post))}})`);
+			}
+			catch (ex) {
+			}
+
 			// Custom debug view setup.
 			if (Config.debug) {
 				this.debugView.modes({ block : true });
@@ -1044,26 +1060,45 @@
 
 				if (init) {
 					try {
-						evalJavaScript(init);
+						(compiledInit ? compiledInit : () => evalJavaScript(init))();
 					}
 					catch (ex) {
 						return this.error(`bad init expression: ${typeof ex === 'object' ? ex.message : ex}`);
 					}
 				}
 
-				while (evalJavaScript(condition)) {
+				const isStatic = !new RegExp(`(?:(${Patterns.variable})|<<|\\$\\{)`).test(payload);
+				const basePayload = payload.replace(/^\n/, '');
+				let staticWrapper = null;
+
+				if (isStatic) {
+					const containerTag = this.output && this.output.tagName ? this.output.tagName : 'div';
+					staticWrapper = document.createElement(containerTag);
+					new Wikifier(staticWrapper, basePayload);
+				}
+
+				const conditionEval = compiledCondition ? compiledCondition : () => evalJavaScript(condition);
+				let postEval = null;
+				if (post) {
+					postEval = compiledPost ? compiledPost : () => evalJavaScript(post);
+				}
+
+				while (conditionEval()) {
 					if (Wikifier.stopWikify) return;
 
 					if (--safety < 0) {
 						return this.error(`exceeded configured maximum loop iterations (${Config.macros.maxLoopIterations})`);
 					}
 
-					new Wikifier(
-						this.output,
-						first ? payload.replace(/^\n/, '') : payload,
-						undefined,
-						this.passageObj
-					);
+					if (isStatic) {
+						const frag = document.createDocumentFragment();
+						staticWrapper.childNodes.forEach(node => frag.appendChild(node.cloneNode(true)));
+						this.output.appendChild(frag);
+					}
+					else {
+						const wikifySource = first ? basePayload : payload;
+						new Wikifier(this.output, wikifySource);
+					}
 
 					if (first) {
 						first = false;
@@ -1081,7 +1116,7 @@
 
 					if (post) {
 						try {
-							evalJavaScript(post);
+							postEval();
 						}
 						catch (ex) {
 							return this.error(`bad post expression: ${typeof ex === 'object' ? ex.message : ex}`);
@@ -1098,15 +1133,7 @@
 		},
 
 		handleForRange(payload, indexVar, valueVar, rangeExp) {
-			let first     = true;
-			let rangeList;
-
-			try {
-				rangeList = this.self.toRangeList(rangeExp);
-			}
-			catch (ex) {
-				return this.error(ex.message);
-			}
+			let first = true;
 
 			// Custom debug view setup.
 			if (Config.debug) {
@@ -1116,33 +1143,97 @@
 			try {
 				TempState.break = null;
 
-				for (let i = 0; i < rangeList.length; ++i) {
+				let rangeValue;
+
+				try {
+					rangeValue = Scripting.evalJavaScript(rangeExp[0] === '{' ? `(${rangeExp})` : rangeExp);
+				}
+				catch (ex) {
+					return this.error(typeof ex === 'object' ? ex.message : ex);
+				}
+				const isStatic = !(new RegExp(Patterns.variable).test(payload) || payload.indexOf('<<') !== -1 || payload.indexOf('${') !== -1);
+				const baseSource = payload.replace(/^\n/, '');
+				let staticWrapper = null;
+
+				if (isStatic) {
+					const containerTag = this.output && this.output.tagName ? this.output.tagName : 'div';
+					staticWrapper = document.createElement(containerTag);
+					new Wikifier(staticWrapper, baseSource);
+				}
+
+				const renderBody = (idx, val) => {
 					if (indexVar.name) {
-						State[indexVar.type][indexVar.name] = rangeList[i][0];
+						State[indexVar.type][indexVar.name] = idx;
 					}
 
-					State[valueVar.type][valueVar.name] = rangeList[i][1];
+					State[valueVar.type][valueVar.name] = val;
 
-					new Wikifier(
-						this.output,
-						first ? payload.replace(/^\n/, '') : payload,
-						undefined,
-						this.passageObj
-					);
-
-					if (first) {
-						first = false;
+					if (isStatic) {
+						const frag = document.createDocumentFragment();
+						staticWrapper.childNodes.forEach(node => frag.appendChild(node.cloneNode(true)));
+						this.output.appendChild(frag);
 					}
+					else {
+						new Wikifier(this.output, first ? baseSource : payload);
+					}
+				};
 
-					if (TempState.break != null) { // lazy equality for null
-						if (TempState.break === 1) {
-							TempState.break = null;
+				if (typeof rangeValue === 'string') {
+					for (let i = 0; i < rangeValue.length;) {
+						const obj = Util.charAndPosAt(rangeValue, i);
+						renderBody(i, obj.char);
+						i = 1 + obj.end;
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
 						}
-						else if (TempState.break === 2) {
-							TempState.break = null;
-							break;
+					}
+				}
+				else if (Array.isArray(rangeValue)) {
+					for (let i = 0; i < rangeValue.length; ++i) {
+						renderBody(i, rangeValue[i]);
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
 						}
 					}
+				}
+				else if (rangeValue instanceof Set) {
+					let i = 0;
+					for (const val of rangeValue) {
+						renderBody(i++, val);
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
+						}
+					}
+				}
+				else if (rangeValue instanceof Map) {
+					for (const [key, val] of rangeValue) {
+						renderBody(key, val);
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
+						}
+					}
+				}
+				else if (typeof rangeValue === 'object' && rangeValue !== null) {
+					const keys = Object.keys(rangeValue);
+					for (let i = 0; i < keys.length; ++i) {
+						renderBody(keys[i], rangeValue[keys[i]]);
+						if (first) { first = false; }
+						if (TempState.break != null) {
+							if (TempState.break === 1) { TempState.break = null; }
+							else if (TempState.break === 2) { TempState.break = null; break; }
+						}
+					}
+				}
+				else {
+					throw new Error(`unsupported range expression type: ${typeof rangeValue}`);
 				}
 			}
 			catch (ex) {
@@ -1235,9 +1326,9 @@
 		Interactive Macros.
 	*******************************************************************************************************************/
 	/*
-		<<button>> & <<link>>
+		<<button>> & <<link>> & <<here>>
 	*/
-	Macro.add(['button', 'link'], {
+	Macro.add(['button', 'link', 'here'], {
 		isAsync : true,
 		tags    : null,
 
@@ -1251,58 +1342,47 @@
 
 			if (typeof this.args[0] === 'object') {
 				if (this.args[0].isImage) {
-					// Argument was in wiki image syntax.
-					const $image = jQuery(document.createElement('img'))
-						.attr('src', this.args[0].source)
-						.appendTo($link);
-
-					$link.addClass('link-image');
-
-					if (this.args[0].hasOwnProperty('passage')) {
-						$image.attr('data-passage', this.args[0].passage);
-					}
-
-					if (this.args[0].hasOwnProperty('title')) {
-						$image.attr('title', this.args[0].title);
-					}
-
-					if (this.args[0].hasOwnProperty('align')) {
-						$image.attr('align', this.args[0].align);
-					}
-
+					const $image = $('<img>').attr('src', this.args[0].source).appendTo($link);
+					['passage', 'title', 'align'].forEach(attr => {
+						if (Object.hasOwn(this.args[0], attr)) {
+							$image.attr(attr, this.args[0][attr]);
+						}
+					});
 					passage = this.args[0].link;
-				}
-				else {
-					// Argument was in wiki link syntax.
-					$link.append(document.createTextNode(this.args[0].text));
+				} else {
+					$link.append(document.createTextNode(Wikifier.wikifyEval(this.args[0].text).textContent));
 					passage = this.args[0].link;
 				}
 			}
-			else {
-				// Argument was simply the link text.
+			 else {
 				$link.wikiWithOptions({ profile : 'core' }, this.args[0]);
-				passage = this.args.length > 1 ? this.args[1] : undefined;
+				passage = this.args[1];
 			}
 
-			if (passage != null) { // lazy equality for null
-				$link.attr('data-passage', passage);
+			// <<here>> macro
+			if (this.name === 'here') {
+				passage = State.passage;
+				if (typeof this.args[0] !== 'object' && typeof this.args[1] === 'string' && Story.has(this.args[1])) {
+					this.args.splice(1, 1);
+				}
+			}
 
+			if (passage) {
+				$link.attr('data-passage', passage).addClass(Story.has(passage) ? 'link-internal' : 'link-broken');
 				if (Story.has(passage)) {
-					$link.addClass('link-internal');
-
+					Engine.flags.noValidLinks = false;
 					if (Config.addVisitedLinkClass && State.hasPlayed(passage)) {
 						$link.addClass('link-visited');
 					}
-				}
-				else {
-					$link.addClass('link-broken');
 				}
 			}
 			else {
 				$link.addClass('link-internal');
 			}
 
-			const macroThis = this;
+
+			Macro.hooks.emit('link:beforeAppend', { macro : this, $link, args : this.args });
+
 			$link
 				.addClass(`macro-${this.name}`)
 				.ariaClick({
@@ -1311,13 +1391,18 @@
 					one       : passage != null // lazy equality for null
 				}, this.createShadowWrapper(
 					this.payload[0].contents !== ''
-						? () => Wikifier.wikifyEval(this.payload[0].contents.trim(), macroThis.passageObj)
+						? () => Wikifier.wikifyEval(this.payload[0].contents.trim())
 						: null,
 					passage != null // lazy equality for null
-						? () => Engine.play(passage)
+						? () => {
+							Macro.hooks.emit('link:beforePlay', { macro : this, $link, args : this.args, output : this.output, passage });
+							Engine.play(passage);
+						}
 						: null
 				))
 				.appendTo(this.output);
+
+			Macro.hooks.emit('link:afterAppend', { macro : this, $link, args : this.args, output : this.output, passage });
 		}
 	});
 
@@ -1330,65 +1415,131 @@
 		handler() {
 			if (this.args.length < 3) {
 				const errors = [];
-				if (this.args.length < 1) { errors.push('variable name'); }
-				if (this.args.length < 2) { errors.push('unchecked value'); }
-				if (this.args.length < 3) { errors.push('checked value'); }
+				if (this.args.length < 1) errors.push('variable name');
+				if (this.args.length < 2) errors.push('unchecked value');
+				if (this.args.length < 3) errors.push('checked value');
 				return this.error(`no ${errors.join(' or ')} specified`);
 			}
-
-			// Ensure that the variable name argument is a string.
 			if (typeof this.args[0] !== 'string') {
 				return this.error('variable name argument is not a string');
 			}
-
 			const varName = this.args[0].trim();
-
-			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
-			const varId        = Util.slugify(varName);
+			const idName = varName.replace(/\[(\$\S+)\]/g, (_, keyVar) => {
+				const keyValue = State.getVar(keyVar) ?? keyVar;
+				return `-${keyValue}`;
+			});
+			const varId = Util.slugify(idName);
 			const uncheckValue = this.args[1];
-			const checkValue   = this.args[2];
-			const el           = document.createElement('input');
+			const checkValue = this.args[2];
 
-			/*
-				Set up and append the input element to the output buffer.
-			*/
-			jQuery(el)
+			let group = null;
+			let limit = null;
+			let tooltipMessage = null;
+			let callbacks = {};
+
+			const arg4 = this.args[4];
+
+			if (typeof arg4 === 'object' && arg4 !== null && (arg4.onToggle || Object.keys(arg4).length > 0)) {
+				callbacks = arg4;
+			} else {
+				group = typeof arg4 === 'string' && arg4.trim() ? arg4.trim() : null;
+				limit = Number.isFinite(Number(this.args[5])) ? Number(this.args[5]) : null;
+				tooltipMessage = typeof this.args[6] === 'string' && this.args[6].trim() ? this.args[6].trim() : null;
+				if (typeof this.args[7] === 'object' && this.args[7] !== null) {
+					callbacks = this.args[7];
+				}
+			}
+
+			const onToggle = typeof callbacks.onToggle === 'function' ? callbacks.onToggle : null;
+
+			const $el = jQuery('<input type="checkbox" tabindex="0">')
 				.attr({
 					id       : `${this.name}-${varId}`,
 					name     : `${this.name}-${varId}`,
 					type     : 'checkbox',
-					tabindex : 0 // for accessiblity
+					tabindex : 0
 				})
-				.addClass(`macro-${this.name}`)
-				.on('change.macros', this.createShadowWrapper(function () {
-					State.setVar(varName, this.checked ? checkValue : uncheckValue);
-				}))
-				.appendTo(this.output);
+				.addClass(`macro-${this.name}`);
 
-			/*
-				Set the variable and input element to the appropriate value and state, as requested.
-			*/
+			if (group) $el.attr('data-limit-group', group);
+			if (limit !== null) $el.attr('data-limit-threshold', limit);
+			if (tooltipMessage) {
+				$el.attr('data-tooltip-message', tooltipMessage);
+				if ($.fn.tooltip) {
+					$el.tooltip({ message : tooltipMessage, cursor : null }).tooltip('disable');
+				}
+			}
+
+			const enforceGroup = triggerEl => {
+				if (!group) return;
+				const $boxes = $(`[data-limit-group="${group}"]`);
+				const checkedCount = $boxes.filter(':checked').length;
+
+				let threshold;
+				if (triggerEl) {
+					const raw = $(triggerEl).data('limit-threshold');
+					threshold = raw != null && Number.isFinite(Number(raw)) ? Number(raw) : $boxes.length;
+				} else {
+					const $withLimit = $boxes.filter((_, el) => Number.isFinite(Number($(el).data('limit-threshold')))).first();
+					threshold = $withLimit.length ? Number($withLimit.data('limit-threshold')) : $boxes.length;
+				}
+
+				$boxes.each(function () {
+					const $box = $(this);
+					const disable = !$box.prop('checked') && checkedCount >= threshold;
+					$box.prop('disabled', disable);
+
+					const msg = $box.data('tooltip-message');
+					if (msg) {
+						if ($.fn.tooltip) $box.tooltip(disable ? 'enable' : 'disable');
+						$box.css('cursor', disable ? 'pointer' : '');
+					}
+				});
+			};
+
+			$el.on(
+				'change.macros',
+				this.createShadowWrapper(function () {
+					const checked = this.checked;
+					State.setVar(varName, checked ? checkValue : uncheckValue);
+
+					if (onToggle) {
+						try {
+							onToggle(checked);
+						}
+						catch (err) {
+							console.error('checkbox onToggle error:', err);
+						}
+					}
+
+					enforceGroup(this);
+				})
+			);
+
+			$el.appendTo(this.output);
+
 			switch (this.args[3]) {
 			case 'autocheck':
 				if (State.getVar(varName) === checkValue) {
-					el.checked = true;
-				}
-				else {
+					$el.prop('checked', true);
+				} else {
 					State.setVar(varName, uncheckValue);
 				}
 				break;
 			case 'checked':
-				el.checked = true;
+				$el.prop('checked', true);
 				State.setVar(varName, checkValue);
 				break;
 			default:
 				State.setVar(varName, uncheckValue);
 				break;
 			}
+
+			enforceGroup($el[0]);
 		}
 	});
 
@@ -1413,8 +1564,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			const varId = Util.slugify(varName);
@@ -1636,7 +1787,6 @@
 			const $insert    = jQuery(document.createElement('span'));
 			const transition = this.args.length > 1 && this.self.t8nRe.test(this.args[1]);
 
-			const macroThis = this;
 			$link
 				.wikiWithOptions({ profile : 'core' }, this.args[0])
 				.addClass(`link-internal macro-${this.name}`)
@@ -1656,7 +1806,7 @@
 
 						if (this.payload[0].contents !== '') {
 							const frag = document.createDocumentFragment();
-							new Wikifier(frag, this.payload[0].contents, undefined, macroThis.passageObj);
+							new Wikifier(frag, this.payload[0].contents);
 							$insert.append(frag);
 						}
 
@@ -1706,8 +1856,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			// Custom debug view setup.
@@ -1816,8 +1966,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			const varId      = Util.slugify(varName);
@@ -1892,8 +2042,8 @@
 			const varName = this.args[0].trim();
 
 			// Try to ensure that we receive the variable's name (incl. sigil), not its value.
-			if (varName[0] !== '$' && varName[0] !== '_') {
-				return this.error(`variable name "${this.args[0]}" is missing its sigil ($ or _)`);
+			if (!(varName.startsWith('$_') || varName[0] === '$' || varName[0] === '_')) {
+				return this.error(`variable name "${this.args[0]}" is missing its sigil ($, $_ or _)`);
 			}
 
 			// Custom debug view setup.
@@ -2156,6 +2306,7 @@
 			if (this.name !== 'back' || momentIndex !== -1) {
 				$link = jQuery(document.createElement('a'))
 					.addClass('link-internal')
+					.each(() => { Engine.flags.noValidLinks = false; })
 					.ariaClick(
 						{ one : true },
 						this.name === 'return'
@@ -2422,6 +2573,7 @@
 				this.debugView.modes({ hidden : true });
 			}
 
+			// re-number links
 			Links.generate();
 		}
 	});
@@ -3439,8 +3591,6 @@
 				return this.error('no passage specified');
 			}
 
-			// majou here. fuck goto, fuck it's async bullshit, and fuck everyone who uses it. may the truck-kun evacuate you from this plane of existence into a worse one. goto will be a button now.
-			const $link = jQuery(document.createElement('button'));
 			let passage;
 
 			if (typeof this.args[0] === 'object') {
@@ -3451,37 +3601,11 @@
 				// Argument was simply the passage name.
 				passage = this.args[0];
 			}
-			$link.append(document.createTextNode(passage));
 
 			if (!Story.has(passage)) {
 				return this.error(`passage "${passage}" does not exist`);
 			}
 
-			if (passage != null) { // lazy equality for null
-				$link.attr('data-passage', passage);
-
-				if (Story.has(passage)) {
-					$link.addClass('link-internal');
-
-					if (Config.addVisitedLinkClass && State.hasPlayed(passage)) {
-						$link.addClass('link-visited');
-					}
-				}
-				else {
-					$link.addClass('link-broken');
-				}
-			}
-			else {
-				$link.addClass('link-internal');
-			}
-
-			$link.addClass('macro-button')
-				 .ariaClick({
-					namespace: '.macros',
-					role     : 'button',
-					one      : true,
-				 }, this.createShadowWrapper(()=>Engine.play(passage)))
-				 .appendTo(this.output);
 			/*
 				Call `Engine.play()` asynchronously.
 
@@ -3529,11 +3653,10 @@
 				.addClass(`macro-${this.name}`)
 				.appendTo(this.output);
 
-			const macroThis = this;
 			// Register the timer.
 			this.self.registerInterval(this.createShadowWrapper(() => {
 				const frag = document.createDocumentFragment();
-				new Wikifier(frag, this.payload[0].contents, undefined, macroThis.passageObj);
+				new Wikifier(frag, this.payload[0].contents);
 
 				let $output = $wrapper;
 
@@ -3697,11 +3820,10 @@
 				.addClass(`macro-${this.name}`)
 				.appendTo(this.output);
 
-			const macroThis = this;
 			// Register the timer.
 			this.self.registerTimeout(this.createShadowWrapper(item => {
 				const frag = document.createDocumentFragment();
-				new Wikifier(frag, item.content, undefined, macroThis.passageObj);
+				new Wikifier(frag, item.content);
 
 				// Output.
 				let $output = $wrapper;
@@ -3790,9 +3912,6 @@
 			if (this.args.length === 0) {
 				return this.error('no widget name specified');
 			}
-			if (!this.passageObj)  {
-				console.error('Macro widget passageObj cannot find passageObj');
-			}
 
 			const widgetName = this.args[0];
 			const isNonVoid  = this.args.length > 1 && this.args[1] === 'container';
@@ -3807,11 +3926,11 @@
 			}
 
 			try {
-				const macroThis = this;
 				const widgetDef = {
 					isWidget : true,
 					handler  : (function (widgetCode) {
 						return function () {
+							State.pushLocal();
 							const shadowStore = {};
 
 							// Cache the existing value of the `_args` variable, if necessary.
@@ -3836,50 +3955,31 @@
 								this.addShadow('_contents');
 							}
 
-							/* legacy */
-							// Cache the existing value of the `$args` variable, if necessary.
-							if (State.variables.hasOwnProperty('args')) {
-								shadowStore.$args = State.variables.args;
-							}
-
-							// Set up the widget `$args` variable and add a shadow.
-							State.variables.args = State.temporary.args;
-							this.addShadow('$args');
-							/* /legacy */
-
 							try {
 								// Set up the error trapping variables.
 								const resFrag = document.createDocumentFragment();
 								const errList = [];
 
-								// before widget hook
-								if (
-									typeof window.modSC2DataManager !== 'undefined' &&
-									window.modSC2DataManager.getWikifyTracer?.()?.beforeWidget
-								) {
-									const newWidgetCode = window.modSC2DataManager.getWikifyTracer().beforeWidget(
-										widgetCode,
-										widgetName,
-										macroThis.passageTitle || macroThis.passageObj.title,
-										macroThis.passageObj
-									);
-									// Wikify the widget's code.
-									new Wikifier(resFrag, newWidgetCode, undefined, macroThis.passageObj);
-								}
-								else {
-									// Wikify the widget's code.
-									new Wikifier(resFrag, widgetCode, undefined, macroThis.passageObj);
-								}
+								// Wikify the widget's code.
+								new Wikifier(resFrag, widgetCode.replace(/^\n+|\n+$/g, '').replace(/\s+/g, ' '));
 
-								// after widget hook
-								if (typeof window.modSC2DataManager !== 'undefined') {
-									window.modSC2DataManager.getWikifyTracer?.()?.afterWidget?.(
-										widgetCode,
-										widgetName,
-										macroThis.passageTitle || macroThis.passageObj.title,
-										macroThis.passageObj,
-										resFrag
-									);
+								// Returns value on <<exit>>
+								if (this.hasOwnProperty('_widgetReturn')) {
+									const returnValue = this._widgetReturn;
+									while (resFrag.firstChild) {
+										resFrag.removeChild(resFrag.firstChild);
+									}
+									if (returnValue != null && returnValue !== '') {
+										// Temporarily reset stop flag
+										const prevStop = Wikifier.stopWikify;
+										Wikifier.stopWikify = 0;
+										try {
+											new Wikifier(resFrag, String(returnValue));
+										}
+										finally {
+											Wikifier.stopWikify = prevStop;
+										}
+									}
 								}
 
 								// Carry over the output, unless there were errors.
@@ -3891,7 +3991,7 @@
 									this.output.appendChild(resFrag);
 								}
 								else {
-									return this.error(`error${errList.length > 1 ? 's' : ''} within widget code (${errList.join('; ')})`);
+									return this.error(`error${errList.length > 1 ? '' : 's'} within widget code (${errList.join('; ')})`);
 								}
 							}
 							catch (ex) {
@@ -3916,15 +4016,7 @@
 									}
 								}
 
-								/* legacy */
-								// Revert the `$args` variable shadowing.
-								if (shadowStore.hasOwnProperty('$args')) {
-									State.variables.args = shadowStore.$args;
-								}
-								else {
-									delete State.variables.args;
-								}
-								/* /legacy */
+								State.popLocal();
 							}
 						};
 					})(this.payload[0].contents)
@@ -3951,7 +4043,23 @@
 		<<exit>> & <<exitAll>>
 	*/
 	Macro.add(['exit', 'exitAll'], {
+		skipArgs : true,
 		handler() {
+			if (this.name === 'exit' && this.args && this.args.full && this.args.full.length > 0) {
+				try {
+					const normalized = (stringFrom(Scripting.evalJavaScript(this.args.full)) ?? '').replace('[undefined]', '');
+
+					// Find nearest widget context
+					const widgetCtx = this.contextSelect(ctx => ctx.self && ctx.self.isWidget);
+					if (widgetCtx) {
+						widgetCtx._widgetReturn = normalized;
+					}
+				}
+				catch (ex) {
+					return this.error(`bad evaluation: ${typeof ex === 'object' ? `${ex.name}: ${ex.message}` : ex}`);
+				}
+			}
+
 			Wikifier.stopWikify = this.name === 'exit' ? 1 : 2;
 		}
 	});

@@ -8,7 +8,7 @@
 ***********************************************************************************************************************/
 /*
 	global Config, DebugView, EOF, Engine, Lexer, Macro, MacroContext, Patterns, Scripting, State, Story, Template,
-	       Wikifier, stringFrom, throwError
+	       Wikifier, stringFrom, throwError, Perflog
 */
 /* eslint "no-param-reassign": [ 2, { "props" : false } ] */
 
@@ -52,9 +52,7 @@
 				jQuery(document.createElement('blockquote'))
 					.appendTo(w.output)
 					.get(0),
-				this.terminator,
-				undefined,
-				w.passageObj
+				this.terminator
 			);
 		}
 	});
@@ -95,12 +93,7 @@
 				}
 
 				curLevel = newLevel;
-				w.subWikify(
-					destStack[destStack.length - 1],
-					this.terminator,
-					undefined,
-					w.passageObj
-				);
+				w.subWikify(destStack[destStack.length - 1], this.terminator);
 				jQuery(document.createElement('br')).appendTo(destStack[destStack.length - 1]);
 
 				this.lookahead.lastIndex = w.nextMatch;
@@ -144,25 +137,21 @@
 		name      : 'macro',
 		profiles  : ['core'],
 		match     : '<<',
-		lookahead : new RegExp(
-			`<<(/?${Patterns.macroName})(?:\\s*)((?:(?:/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/)|(?://.*\\n)|(?:\`(?:\\\\.|[^\`\\\\])*\`)|(?:"(?:\\\\.|[^"\\\\])*")|(?:'(?:\\\\.|[^'\\\\])*')|(?:\\[(?:[<>]?[Ii][Mm][Gg])?\\[[^\\r\\n]*?\\]\\]+)|[^>]|(?:>(?!>)))*)>>`,
-			'gm'
-		),
-		working : { source : '', name : '', arguments : '', index : 0 }, // the working parse object
-		context : null, // last execution context object (top-level macros, hierarchically, have a null context)
+		lookahead : new RegExp(`<<(/?${Patterns.macroName})(?:\\s*)((?:(?:/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/)|(?://.*\\n)|(?:\`(?:\\\\.|[^\`\\\\])*\`)|(?:"(?:\\\\.|[^"\\\\])*")|(?:'(?:\\\\.|[^'\\\\])*')|(?:\\[(?:[<>]?[Ii][Mm][Gg])?\\[[^\\r\\n]*?\\]\\]+)|[^>]|(?:>(?!>)))*)>>`, 'gm'),
+		working   : { source : '', name : '', arguments : '', index : 0 }, // the working parse object
+		context   : null, // last execution context object (top-level macros, hierarchically, have a null context)
 
 		handler(w) {
-			// console.log('Wikifier.Parser.add macro handler(w):', w, this.context, this);
 			const matchStart = this.lookahead.lastIndex = w.matchStart;
 
 			if (this.parseTag(w)) {
-			/*
-				If `parseBody()` is called below, it will modify the current working
-				values, so we must cache them now.
-			*/
+				/*
+					If `parseBody()` is called below, it will modify the current working
+					values, so we must cache them now.
+				*/
 				const nextMatch = w.nextMatch;
-				const name = this.working.name;
-				const rawArgs = this.working.arguments;
+				const name      = this.working.name;
+				const rawArgs   = this.working.arguments;
 				let macro;
 
 				try {
@@ -173,11 +162,14 @@
 
 						if (typeof macro.tags !== 'undefined') {
 							payload = this.parseBody(w, macro);
-							// console.log('Wikifier.Parser.add macro handler() payload:', structuredClone(payload), this.context);
 
 							if (!payload) {
 								w.nextMatch = nextMatch; // we must reset `w.nextMatch` here, as `parseBody()` modifies it
-								return throwError(w.output, `cannot find a closing tag for macro <<${name}>>`, `${w.source.slice(matchStart, w.nextMatch)}\u2026`);
+								return throwError(
+									w.output,
+									`cannot find a closing tag for macro <<${name}>>`,
+									`${w.source.slice(matchStart, w.nextMatch)}\u2026`
+								);
 							}
 						}
 
@@ -187,41 +179,40 @@
 								: payload[0].args;
 
 							/*
-							New-style macros.
-						*/
-							if (typeof macro._MACRO_API !== 'undefined') {
-							/*
-								Add the macro's execution context to the context chain.
+								New-style macros.
 							*/
+							if (typeof macro._MACRO_API !== 'undefined') {
+								/*
+									Add the macro's execution context to the context chain.
+								*/
 								this.context = new MacroContext({
 									macro,
 									name,
 									args,
 									payload,
-									source     : w.source.slice(matchStart, w.nextMatch),
-									parent     : this.context,
-									parser     : w,
-									passageObj : w.passageObj
+									source : w.source.slice(matchStart, w.nextMatch),
+									parent : this.context,
+									parser : w
 								});
 
 								/*
-								Call the handler.
+									Call the handler.
 
-								NOTE: There's no catch clause here because this try/finally exists solely
-								to ensure that the execution context is properly restored in the event
-								that an uncaught exception is thrown during the handler call.
-							*/
-								try {
-									// console.log('macro.handler.call', macro, this.context);
-									macro.handler.call(this.context);
-								/*
-									QUESTION: Swap to the following, which passes macro arguments in
-									as parameters to the handler function, in addition to them being
-									available on its `this`?  If so, it might still be something to
-									hold off on until v3, when the legacy macro API is removed.
-
-									macro.handler.apply(this.context, this.context.args);
+									NOTE: There's no catch clause here because this try/finally exists solely
+									to ensure that the execution context is properly restored in the event
+									that an uncaught exception is thrown during the handler call.
 								*/
+								try {
+									Perflog.logWidgetStart(name);
+									macro.handler.call(this.context);
+									/*
+										QUESTION: Swap to the following, which passes macro arguments in
+										as parameters to the handler function, in addition to them being
+										available on its `this`?  If so, it might still be something to
+										hold off on until v3, when the legacy macro API is removed.
+
+										macro.handler.apply(this.context, this.context.args);
+									*/
 								}
 								finally {
 									// eslint-disable-next-line max-depth
@@ -229,30 +220,7 @@
 										Wikifier.stopWikify = 0;
 									}
 									this.context = this.context.parent;
-								}
-							}
-							else {
-							/*
-							[DEPRECATED] Old-style/legacy macros.
-						*/
-								/*
-								Set up the raw arguments string.
-							*/
-								const prevRawArgs = w._rawArgs;
-								w._rawArgs = rawArgs;
-
-								/*
-								Call the handler.
-
-								NOTE: There's no catch clause here because this try/finally exists solely
-								to ensure that the previous raw arguments string is properly restored in
-								the event that an uncaught exception is thrown during the handler call.
-							*/
-								try {
-									macro.handler(w.output, name, args, w, payload);
-								}
-								finally {
-									w._rawArgs = prevRawArgs;
+									Perflog.logWidgetEnd(name);
 								}
 							}
 						}
@@ -273,7 +241,11 @@
 						);
 					}
 					else {
-						return throwError(w.output, `macro <<${name}>> does not exist`, w.source.slice(matchStart, w.nextMatch));
+						return throwError(
+							w.output,
+							`macro <<${name}>> does not exist`,
+							w.source.slice(matchStart, w.nextMatch)
+						);
 					}
 				}
 				catch (ex) {
@@ -284,10 +256,10 @@
 					);
 				}
 				finally {
-					this.working.source = '';
-					this.working.name = '';
+					this.working.source    = '';
+					this.working.name      = '';
 					this.working.arguments = '';
-					this.working.index = 0;
+					this.working.index     = 0;
 				}
 			}
 			else {
@@ -296,16 +268,15 @@
 		},
 
 		parseTag(w) {
-			// console.log('Wikifier.Parser.add macro parseTag(w):', w, this.context, this);
 			const match = this.lookahead.exec(w.source);
 
 			if (match && match.index === w.matchStart && match[1]) {
 				w.nextMatch = this.lookahead.lastIndex;
 
-				this.working.source = w.source.slice(match.index, this.lookahead.lastIndex);
-				this.working.name = match[1];
+				this.working.source    = w.source.slice(match.index, this.lookahead.lastIndex);
+				this.working.name      = match[1];
 				this.working.arguments = match[2];
-				this.working.index = match.index;
+				this.working.index     = match.index;
 
 				return true;
 			}
@@ -314,18 +285,16 @@
 		},
 
 		parseBody(w, macro) {
-			// console.log('Wikifier.Parser.add macro parseBody(w, macro):', w, macro, structuredClone(this.working), this.context, this);
-			// console.log('Wikifier.Parser.add macro parseBody(w, macro):', structuredClone(this.working), this.context);
-			const openTag = this.working.name;
+			const openTag  = this.working.name;
 			const closeTag = `/${openTag}`;
 			const closeAlt = `end${openTag}`;
 			const bodyTags = Array.isArray(macro.tags) ? macro.tags : false;
-			const payload = [];
-			let end = -1;
-			let opened = 1;
-			let curSource = this.working.source;
-			let curTag = this.working.name;
-			let curArgument = this.working.arguments;
+			const payload  = [];
+			let end          = -1;
+			let opened       = 1;
+			let curSource    = this.working.source;
+			let curTag       = this.working.name;
+			let curArgument  = this.working.arguments;
 			let contentStart = w.nextMatch;
 
 			while ((w.matchStart = w.source.indexOf(this.match, w.nextMatch)) !== -1) {
@@ -335,11 +304,11 @@
 				}
 
 				const tagSource = this.working.source;
-				const tagName = this.working.name;
-				const tagArgs = this.working.arguments;
-				const tagBegin = this.working.index;
-				const tagEnd = w.nextMatch;
-				const hasArgs = tagArgs.trim() !== '';
+				const tagName   = this.working.name;
+				const tagArgs   = this.working.arguments;
+				const tagBegin  = this.working.index;
+				const tagEnd    = w.nextMatch;
+				const hasArgs   = tagArgs.trim() !== '';
 
 				switch (tagName) {
 				case openTag:
@@ -357,7 +326,7 @@
 					break;
 
 				default:
-					if (hasArgs && tagName.startsWith('/')) {
+					if (hasArgs && tagName.startsWith('/')) { // tags starting with 'end' used to have same treatment
 						// Skip over malformed alien closing tags.
 						this.lookahead.lastIndex = w.nextMatch = tagBegin + 2 + tagName.length;
 						continue;
@@ -372,9 +341,9 @@
 									args      : this.createArgs(curArgument, this.skipArgs(macro, curTag)),
 									contents  : w.source.slice(contentStart, tagBegin)
 								});
-								curSource = tagSource;
-								curTag = tagName;
-								curArgument = tagArgs;
+								curSource    = tagSource;
+								curTag       = tagName;
+								curArgument  = tagArgs;
 								contentStart = tagEnd;
 							}
 						}
@@ -413,7 +382,7 @@
 				},
 				full : {
 					value : Scripting.parse(rawArgsString)
-				},
+				}
 			});
 
 			return args;
@@ -425,8 +394,8 @@
 
 				return typeof sa === 'boolean' && sa || Array.isArray(sa) && sa.includes(tagName);
 			}
-			else if (typeof macro.skipArg0 !== 'undefined') {
 			/* legacy */
+			else if (typeof macro.skipArg0 !== 'undefined') {
 				return macro.skipArg0 && macro.name === tagName;
 			}
 			/* /legacy */
@@ -435,43 +404,40 @@
 		},
 
 		parseArgs : (() => {
-			const Item = Lexer.enumFromNames([
-			// lex item types object (pseudo-enumeration)
-				'Error', // error
-				'Bareword', // bare identifier
-				'Expression', // expression (backquoted)
-				'String', // quoted string (single or double)
-				'SquareBracket', // [[…]] or [img[…]]
-				'ObjectLiteral',
-				'FunctionCall'
+			const Item = Lexer.enumFromNames([ // lex item types object (pseudo-enumeration)
+				'Error',        // error
+				'Bareword',     // bare identifier
+				'Expression',   // expression (backquoted)
+				'String',       // quoted string (single or double)
+				'SquareBracket' // [[…]] or [img[…]]
 			]);
-			const spaceRe = new RegExp(Patterns.space);
+			const spaceRe    = new RegExp(Patterns.space);
 			const notSpaceRe = new RegExp(Patterns.notSpace);
-			const varTest = new RegExp(`^${Patterns.variable}`);
+			const varTest    = new RegExp(`^${Patterns.variable}`);
 
 			// Lexing functions.
 			function slurpQuote(lexer, endQuote) {
 				loop: for (;;) {
-				/* eslint-disable indent */
-				switch (lexer.next()) {
-					case '\\': {
-						const ch = lexer.next();
+					/* eslint-disable indent */
+					switch (lexer.next()) {
+					case '\\':
+						{
+							const ch = lexer.next();
 
-						if (ch !== EOF && ch !== '\n') {
-							break;
+							if (ch !== EOF && ch !== '\n') {
+								break;
+							}
 						}
-					}
-					/* falls through */
+						/* falls through */
 					case EOF:
 					case '\n':
 						return EOF;
 
 					case endQuote:
 						break loop;
+					}
+					/* eslint-enable indent */
 				}
-				/* eslint-enable indent */
-				}
-
 				return lexer.pos;
 			}
 
@@ -496,11 +462,9 @@
 						break;
 
 					case EOF:
-					case '\n':
 						return false;
 					}
 				}
-
 				return lexer.pos;
 			}
 
@@ -509,7 +473,7 @@
 				let remainingStr = lexer.source.slice(lexer.pos); // Capture the remaining part of the string for lookahead
 
 				if (offset === EOF) {
-				// no non-whitespace characters, so bail
+					// no non-whitespace characters, so bail
 					return null;
 				}
 				else if (offset !== 0) {
@@ -619,9 +583,9 @@
 
 			// Parse function.
 			function parseMacroArgs(rawArgsString) {
-			// Initialize the lexer.
+				// Initialize the lexer.
 				const lexer = new Lexer(rawArgsString, lexSpace);
-				const args = [];
+				const args  = [];
 
 				// Lex the raw argument string.
 				lexer.run().forEach(item => {
@@ -693,10 +657,10 @@
 						else {
 							try {
 								/*
-								The enclosing parenthesis here are necessary to force a code string
-								consisting solely of an object literal to be evaluated as such, rather
-								than as a code block.
-							*/
+									The enclosing parenthesis here are necessary to force a code string
+									consisting solely of an object literal to be evaluated as such, rather
+									than as a code block.
+								*/
 								arg = Scripting.evalTwineScript(`(${arg})`);
 							}
 							catch (ex) {
@@ -727,20 +691,18 @@
 							}
 
 							if (markup.pos < arg.length) {
-								throw new Error(
-									`unable to parse macro argument "${arg}": unexpected character(s) "${arg.slice(markup.pos)}" (pos: ${markup.pos})`
-								);
+								throw new Error(`unable to parse macro argument "${arg}": unexpected character(s) "${arg.slice(markup.pos)}" (pos: ${markup.pos})`);
 							}
 
 							// Convert to a link or image object.
 							if (markup.isLink) {
 								// .isLink, [.text], [.forceInternal], .link, [.setter]
 								arg = { isLink : true };
-								arg.count = markup.hasOwnProperty('text') ? 2 : 1;
-								arg.link = Wikifier.helpers.evalPassageId(markup.link);
-								arg.text = markup.hasOwnProperty('text') ? Wikifier.helpers.evalText(markup.text) : arg.link;
+								arg.count    = markup.hasOwnProperty('text') ? 2 : 1;
+								arg.link     = Wikifier.helpers.evalPassageId(markup.link);
+								arg.text     = markup.hasOwnProperty('text') ? Wikifier.helpers.evalText(markup.text) : arg.link;
 								arg.external = !markup.forceInternal && Wikifier.isExternalLink(arg.link);
-								arg.setFn = markup.hasOwnProperty('setter')
+								arg.setFn    = markup.hasOwnProperty('setter')
 									? Wikifier.helpers.createShadowSetterCallback(Scripting.parse(markup.setter))
 									: null;
 							}
@@ -757,7 +719,7 @@
 										const passage = Story.get(source);
 
 										if (passage.tags.includes('Twine.image')) {
-											imgObj.source = passage.text;
+											imgObj.source  = passage.text;
 											imgObj.passage = passage.title;
 										}
 									}
@@ -774,7 +736,7 @@
 								}
 
 								if (markup.hasOwnProperty('link')) {
-									arg.link = Wikifier.helpers.evalPassageId(markup.link);
+									arg.link     = Wikifier.helpers.evalPassageId(markup.link);
 									arg.external = !markup.forceInternal && Wikifier.isExternalLink(arg.link);
 								}
 
@@ -821,7 +783,7 @@
 		handler(w) {
 			const markup = Wikifier.helpers.parseSquareBracketedMarkup(w);
 
-			if (markup.hasOwnProperty('error')) {
+			if (Object.hasOwn(markup, 'error')) {
 				w.outputText(w.output, w.matchStart, w.nextMatch);
 				return;
 			}
@@ -830,14 +792,12 @@
 
 			// text=(text), forceInternal=(~), link=link, setter=(setter)
 			const link  = Wikifier.helpers.evalPassageId(markup.link);
-			const text  = markup.hasOwnProperty('text') ? Wikifier.helpers.evalText(markup.text) : link;
-			const setFn = markup.hasOwnProperty('setter')
-				? Wikifier.helpers.createShadowSetterCallback(Scripting.parse(markup.setter))
-				: null;
+			const text = Object.hasOwn(markup, 'text') ? Wikifier.wikifyEval(markup.text).textContent : link;
+			const setFn = Object.hasOwn(markup, 'setter') ? Wikifier.helpers.createShadowSetterCallback(Scripting.parse(markup.setter)) : null;
 
 			// Debug view setup.
 			const output = (Config.debug
-				? new DebugView(w.output, 'link-markup', '[[link]]', w.source.slice(w.matchStart, w.nextMatch))
+				? new DebugView(w.output, 'link-markup', '[[Link]]', w.source.slice(w.matchStart, w.nextMatch))
 				: w
 			).output;
 
@@ -965,27 +925,27 @@
 		handler(w) {
 			switch (w.matchText) {
 			case "''":
-				w.subWikify(jQuery(document.createElement('strong')).appendTo(w.output).get(0), "''", undefined, w.passageObj);
+				w.subWikify(jQuery(document.createElement('strong')).appendTo(w.output).get(0), "''");
 				break;
 
 			case '//':
-				w.subWikify(jQuery(document.createElement('em')).appendTo(w.output).get(0), '//', undefined, w.passageObj);
+				w.subWikify(jQuery(document.createElement('em')).appendTo(w.output).get(0), '//');
 				break;
 
 			case '__':
-				w.subWikify(jQuery(document.createElement('u')).appendTo(w.output).get(0), '__', undefined, w.passageObj);
+				w.subWikify(jQuery(document.createElement('u')).appendTo(w.output).get(0), '__');
 				break;
 
 			case '^^':
-				w.subWikify(jQuery(document.createElement('sup')).appendTo(w.output).get(0), '\\^\\^', undefined, w.passageObj);
+				w.subWikify(jQuery(document.createElement('sup')).appendTo(w.output).get(0), '\\^\\^');
 				break;
 
 			case '~~':
-				w.subWikify(jQuery(document.createElement('sub')).appendTo(w.output).get(0), '~~', undefined, w.passageObj);
+				w.subWikify(jQuery(document.createElement('sub')).appendTo(w.output).get(0), '~~');
 				break;
 
 			case '==':
-				w.subWikify(jQuery(document.createElement('s')).appendTo(w.output).get(0), '==', undefined, w.passageObj);
+				w.subWikify(jQuery(document.createElement('s')).appendTo(w.output).get(0), '==');
 				break;
 
 			case '{{{':
@@ -1041,10 +1001,10 @@
 			if (blockLevel) {
 				// Skip the leading and, if it exists, trailing newlines.
 				w.nextMatch += blockMatch[0].length;
-				w.subWikify($el[0], `\\n?${this.terminator}`, undefined, w.passageObj);
+				w.subWikify($el[0], `\\n?${this.terminator}`);
 			}
 			else {
-				w.subWikify($el[0], this.terminator, undefined, w.passageObj);
+				w.subWikify($el[0], this.terminator);
 			}
 		}
 	});
@@ -1192,9 +1152,7 @@
 						? new DebugView(w.output, 'template', w.matchText, w.matchText) // Debug view setup.
 						: w
 					).output,
-					result,
-					undefined,
-					w.passageObj
+					result
 				);
 			}
 		}
@@ -1214,9 +1172,7 @@
 
 			w.subWikify(
 				jQuery(document.createElement(`h${w.matchLength}`)).appendTo(w.output).get(0),
-				this.terminator,
-				undefined,
-				w.passageObj
+				this.terminator
 			);
 		}
 	});
@@ -1270,12 +1226,7 @@
 						if (curRowType === 'c') {
 							$rowContainer.css('caption-side', rowCount === 0 ? 'top' : 'bottom');
 							w.nextMatch += 1;
-							w.subWikify(
-								$rowContainer[0],
-								this.rowTerminator,
-								undefined,
-								w.passageObj
-							);
+							w.subWikify($rowContainer[0], this.rowTerminator);
 						}
 						else {
 							this.rowHandler(
@@ -1358,12 +1309,7 @@
 							curColCount = 1;
 						}
 
-						w.subWikify(
-							$cell[0],
-							this.cellTerminator,
-							undefined,
-							w.passageObj
-						);
+						w.subWikify($cell[0], this.cellTerminator);
 
 						if (w.matchText.substr(w.matchText.length - 2, 1) === ' ') {
 							spaceRight = true;
@@ -1459,9 +1405,7 @@
 						jQuery(document.createElement('li'))
 							.appendTo(destStack[destStack.length - 1])
 							.get(0),
-						this.terminator,
-						undefined,
-						w.passageObj
+						this.terminator
 					);
 				}
 			} while (matched);
@@ -1614,7 +1558,6 @@
 		namespace : 'http://www.w3.org/2000/svg',
 
 		handler(w) {
-			// this handler never be called , don't know why , same as DoL author
 			this.lookahead.lastIndex = w.nextMatch;
 
 			let depth = 1;
@@ -1724,25 +1667,6 @@
 							el.setAttribute('href', passage.text.trim());
 						}
 					}
-					// console.log('############ Wikifier.Parser svgTag output', el.cloneNode(true), el.tagName);
-
-					const hrefLink = el.getAttribute('href') || el.getAttribute('xlink:href') || undefined;
-					if (typeof window.modSC2DataManager !== 'undefined' &&
-						typeof window.modSC2DataManager.getHtmlTagSrcHook?.()?.doHook !== 'undefined' &&
-						!!hrefLink) {
-						if (!el.getAttribute('href') && !el.getAttribute('xlink:href') && !el.getAttribute('ML-href')) {
-							// this case for tag without href attribute and ML-href and xlink:href attribute
-							// in this case simple ignore it
-						}
-						else {
-							// need check the src is not "data:" URI
-							el.setAttribute('ML-href', hrefLink);
-							el.removeAttribute('href');
-							el.removeAttribute('xlink:href');
-							// call img loader on there
-							window.modSC2DataManager.getHtmlTagSrcHook().doHook(el, 'href').catch(Err => console.error(Err));
-						}
-					}
 				}
 
 				// Elsewise, assume a link element of some type—e.g., '<a>'.
@@ -1800,9 +1724,6 @@
 			const tagMatch = this.tagRe.exec(w.matchText);
 			const tag      = tagMatch && tagMatch[1];
 			const tagName  = tag && tag.toLowerCase();
-			// if (tagName.startsWith('img')) {
-			// 	console.log('************************** Wikifier.Parser htmlTag w', [tagName, w, w.output.tagName, w.matchText]);
-			// }
 
 			if (tagName) {
 				const isVoid = this.voidTags.includes(tagName) || w.matchText.endsWith('/>');
@@ -1825,9 +1746,6 @@
 					let debugView;
 
 					el.innerHTML = w.matchText;
-					// if (tagName.startsWith('img')) {
-					// 	console.log('Wikifier.Parser htmlTag innerHTML', el.cloneNode(true));
-					// }
 
 					/*
 						NOTE: The use of a `while` statement here is curious, however,
@@ -1835,13 +1753,7 @@
 					*/
 					while (el.firstChild) {
 						el = el.firstChild;
-						// if (tagName.startsWith('img')) {
-						// 	console.log('Wikifier.Parser htmlTag while firstChild', el.cloneNode(true));
-						// }
 					}
-					// if (tagName.startsWith('img')) {
-					// 	console.log('Wikifier.Parser htmlTag firstChild', el.cloneNode(true));
-					// }
 
 					try {
 						this.processAttributeDirectives(el);
@@ -1882,12 +1794,7 @@
 						*/
 						try {
 							Wikifier.Option.push({ nobr : isNobr });
-							w.subWikify(
-								el,
-								terminator,
-								{ ignoreTerminatorCase : true },
-								w.passageObj
-							);
+							w.subWikify(el, terminator, { ignoreTerminatorCase : true });
 						}
 						finally {
 							Wikifier.Option.pop();
@@ -1902,30 +1809,6 @@
 							debugView.modes({ block : true });
 						}
 					}
-
-					// if (tagName.startsWith('img')) {
-					// 	console.log('************************** Wikifier.Parser htmlTag output', el.cloneNode(true), el.tagName, el.getAttribute('src'));
-					// }
-
-					if (typeof window.modSC2DataManager !== 'undefined' &&
-						typeof window.modSC2DataManager.getHtmlTagSrcHook?.()?.doHook !== 'undefined') {
-						if (tagName === 'img' && !el.getAttribute('src')?.startsWith('data:')) {
-							if (!el.getAttribute('src') && !el.getAttribute('ML-src')) {
-								// this case for img tag without src attribute and without ML-src attribute
-								// in this case simple ignore it
-							}
-							else {
-								// need check the src is not "data:" URI
-								el.setAttribute('ML-src', el.getAttribute('src'));
-								el.removeAttribute('src');
-								// call img loader on there
-								window.modSC2DataManager.getHtmlTagSrcHook().doHook(el, 'src').catch(Err => console.error(Err));
-							}
-						}
-					}
-					// if (tagName.startsWith('img')) {
-					// 	console.log('************************** Wikifier.Parser htmlTag removeAttribute', el.cloneNode(true));
-					// }
 
 					/*
 						NOTE: The use of `cloneNode(true)` here for `<track>` elements
@@ -1949,9 +1832,6 @@
 			// members of said collection if any directives are found.
 			[...el.attributes].forEach(({ name, value }) => {
 				const evalShorthand = name[0] === '@';
-				// if (el.tagName === 'IMG') {
-				// 	console.log('Wikifier.Parser htmlTag processAttributeDirectives', el.cloneNode(true));
-				// }
 
 				if (evalShorthand || name.startsWith('sc-eval:')) {
 					const newName = name.slice(evalShorthand ? 1 : 8); // Remove eval directive prefix.
@@ -1980,9 +1860,6 @@
 							attribute names that, after removing the directive prefix, are
 							unpalatable to `setAttribute()`.
 						*/
-						// if (newName === 'src') {
-						// 	console.log('Wikifier.Parser htmlTag processAttributeDirectives src', [el, result]);
-						// }
 						el.setAttribute(newName, result);
 						el.removeAttribute(name);
 					}
@@ -1995,9 +1872,6 @@
 
 		processDataAttributes(el, tagName) {
 			let passage = el.getAttribute('data-passage');
-			// if (el.tagName === 'IMG') {
-			// 	console.log('Wikifier.Parser htmlTag processDataAttributes', el.cloneNode(true));
-			// }
 
 			if (passage == null) { // lazy equality for null
 				return;
@@ -2043,9 +1917,6 @@
 						}
 
 						if (passage.tags.includes(twineTag)) {
-							// if (parentName !== 'picture') {
-							// 	console.log('Wikifier.Parser htmlTag processDataAttributes src', passage.text.trim());
-							// }
 							el[parentName === 'picture' ? 'srcset' : 'src'] = passage.text.trim();
 						}
 					}

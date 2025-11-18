@@ -26,7 +26,6 @@ var Alert = (() => { // eslint-disable-line no-unused-vars, no-var
 		Error Functions.
 	*******************************************************************************************************************/
 	function mesg(where, error, isFatal, isUncaught) {
-		// console.error(where, error);
 		let mesg = 'Error';
 		let nice = `A${isFatal ? ' fatal' : 'n'} error has occurred.`;
 

@@ -220,8 +220,10 @@ var Passage = (() => { // eslint-disable-line no-unused-vars, no-var
 			// console.log('frag HTML', div.innerHTML.trim());
 			// console.log('frag text', frag.cloneNode(true).textContent.trim());
 
-			// Update the excerpt cache to reflect the rendered text.
-			this._excerpt = Passage.getExcerptFromNode(frag);
+			// Update the excerpt cache to reflect the rendered text, if we need it for the passage description
+			if (Config.passages.descriptions == null) {
+				this._excerpt = Passage.getExcerptFromNode(frag);
+			}
 
 			return frag;
 		}

@@ -118,7 +118,9 @@ var UIBar = (() => { // eslint-disable-line no-unused-vars, no-var
 		jQuery(document)
 			// Set up a handler for the history-backward/-forward buttons.
 			.on(':historyupdate.ui-bar', (($backward, $forward) => () => {
-				$backward.ariaDisabled(State.length < 2);
+				const prev = State.length >= 2 ? State.peek(1) : null;
+				const disableBack = State.length < 2 || prev && prev.title === Config.passages.start;
+				$backward.ariaDisabled(disableBack);
 				$forward.ariaDisabled(State.length === State.size);
 			})(jQuery('#history-backward'), jQuery('#history-forward')));
 	}
@@ -162,7 +164,10 @@ var UIBar = (() => { // eslint-disable-line no-unused-vars, no-var
 			}, () => _$uiBar.toggleClass('stowed'));
 
 		jQuery('#history-backward')
-			.ariaDisabled(State.length < 2)
+			.ariaDisabled((() => {
+				const prev = State.length >= 2 ? State.peek(1) : null;
+				return State.length < 2 || prev && prev.title === Config.passages.start;
+			})())
 			.ariaClick({
 				label : L10n.get('uiBarBackward')
 			}, () => Engine.backward());

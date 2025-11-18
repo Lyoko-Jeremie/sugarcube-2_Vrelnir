@@ -15,6 +15,7 @@ const Links = (() => {
 	let keyNumberMatcher;
 	let maxKeyDescLength;
 	let throttle = false;
+	let shiftDown = false;
 	let skipElements = ".no-numberify, .no-numberify *"; // here, we match class "no-numberify", and then also all it's children
 	let includeElements = ""; // here, we can set up a matcher for exceptions that shouldn't be skipped
 
@@ -66,13 +67,8 @@ const Links = (() => {
 			currentLinks = currentLinks.not(baddies);
 		}
 
-		for (let i = 0; i < currentLinks.length; i++) {
+		for (let i = 0; i < Math.min(currentLinks.length, 40); i++) {
 			const el = currentLinks[i];
-			if (i === 40) {
-				// we don't have enough shortcuts
-				if (enabled === "debug") console.log("Links: there's too many! found", currentLinks.length, "matches, exiting after the 40th one.\n time spent: ", performance.now() - stamp)
-				return;
-			}
 			const keyNumber = numberPrepend + getPrettyKeyNumber(i + 1) + numberAppend;
 			if (keyNumberMatcher.test(el.innerHTML.slice(0, maxKeyDescLength))) {
 				// replace previously assigned number
@@ -81,7 +77,7 @@ const Links = (() => {
 				el.prepend(keyNumber);
 			}
 		}
-		if (enabled === "debug") console.log("Links: generated", currentLinks.length, "links, took", performance.now() - stamp, "ms");
+		if (enabled === "debug") console.log(`Links: generated ${currentLinks.length} links, took ${performance.now() - stamp}ms"`);
 	}
 
 	// this is a mostly user-triggered function that is almost guaranteed to have the passage already rendered
@@ -112,18 +108,20 @@ const Links = (() => {
 
 		// prevent numpad keys from triggering browser's default shortcuts
 		$(document).on("keydown", ev => {
+			if (ev.code.startsWith("Shift")) return shiftDown = true;
 			if (inputFocused()) return;
 			if (ev.code.startsWith("Numpad")) ev.preventDefault();
 		});
 
 		// assign shortcuts
 		$(document).on("keyup", ev => {
+			if (ev.code.startsWith("Shift")) return shiftDown = false;
 			if (!enabled || V.tempDisable || V.options && !V.options.numberify_enabled || inputFocused()) return;
 			if (Dialog.isOpen()) return ev.code === "Escape" ? Dialog.close() : false;
 
 			let offset = 0;
 			if (ev.shiftKey) offset = 10;
-			else if (ev.code.startsWith("Numpad") && ev.keyCode < 90) offset = 10; // windows must die
+			else if (ev.code.startsWith("Numpad") && shiftDown) offset = 10; // windows must die
 			else if (ev.ctrlKey) offset = 20;
 			else if (ev.altKey) offset = 30;
 
@@ -198,7 +196,6 @@ const Links = (() => {
 		disableNumbers:      { get() { return disableNumbers;   }, set(val) { disableNumbers = val; } },
 		throttle:            { get() { return throttle;         }, set(val) { throttle = val; } },
 		currentLinks:        { get() { return currentLinks;     } },
-
 	}));
 })();
 window.Links = Links;

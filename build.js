@@ -19,12 +19,6 @@
 const CONFIG = {
 	js : {
 		files : [
-			// i18n framework insert here
-			// 'i18n/node_modules/jszip/dist/jszip.js',
-			// 'i18n/dist/TypeA.js',
-			// 'i18n/dist/TypeB.js',
-			// I18NManager must in the end of i18n framework
-			// 'i18n/dist/I18NManager.js',
 			// The ordering herein is significant.
 			'src/lib/alert.js',
 			'src/lib/patterns.js',
@@ -52,6 +46,7 @@ const CONFIG = {
 			'src/config.js',
 			'src/simpleaudio.js',
 			'src/state.js',
+			'src/lib/perflog.js',
 			'src/markup/scripting.js',
 			'src/markup/lexer.js',
 			'src/markup/wikifier.js',
@@ -73,9 +68,7 @@ const CONFIG = {
 			'src/loadscreen.js',
 			'src/idb_backend.js',
 			'src/hotkeys.js',
-			'src/sugarcube.js',
-			// cs2 locale init as chs
-			'locale/chs.js'
+			'src/sugarcube.js'
 		],
 		wrap : {
 			intro : 'src/templates/intro.js',
@@ -96,14 +89,13 @@ const CONFIG = {
 			'src/css/ui-dialog.css',
 			'src/css/ui.css',
 			'src/css/ui-bar.css',
-			'src/css/ui-debug.css',
-			'src/css/idb_backend.css'
+			'src/css/idb_backend.css',
+			'src/css/ui-debug.css'
 		]
 	},
 	libs : [
 		// The ordering herein is significant.
 		'src/vendor/classList.min.js',
-		'src/vendor/jsondiffpatch.umd.min.js',
 		'src/vendor/jquery.min.js',
 		'src/vendor/jquery.ba-throttle-debounce.min.js',
 		'src/vendor/imagesloaded.pkgd.min.js',
@@ -169,10 +161,11 @@ const {
 } = require('./scripts/build-utils');
 const _path = require('path');
 const _opt  = require('node-getopt').create([
-	['b', 'build=VERSION', 'Build only for Twine major version: 1 or 2; default: build for all.'],
+	['b', 'build=VERSION', 'Build only for Twine major version: 1 or 2; default: build for 2.'],
 	['d', 'debug',         'Keep debugging code; gated by DEBUG symbol.'],
 	['u', 'unminified',    'Suppress minification stages.'],
-	['t', 'transpile',  'Enable JavaScript transpilation stages.'],
+	['n', 'no-transpile',  'Suppress JavaScript transpilation stages. (unused)'],
+	['t', 'transpile',     'Enable JavaScript transpilation stages.'],
 	['h', 'help',          'Print this help, then exit.']
 ])
 	.bindHelp()
@@ -352,7 +345,6 @@ function compileJavaScript(filenameObj, options) {
 function compileStyles(config) {
 	log('compiling CSS...');
 
-	const autoprefixer = require('autoprefixer');
 	const mixins       = require('postcss-mixins');
 	const postcss      = require('postcss');
 	const CleanCSS     = require('clean-css');

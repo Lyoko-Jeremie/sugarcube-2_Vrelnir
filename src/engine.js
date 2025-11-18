@@ -39,6 +39,9 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 	// List of objects describing `StoryInterface` elements to update via passages during navigation.
 	let _updating = null;
 
+	// Runtime flags
+	const _flags = { noValidLinks : true };
+
 
 	/*******************************************************************************************************************
 		Engine Functions.
@@ -186,8 +189,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		*/
 		Story.getAllInit().forEach(passage => {
 			try {
-				console.log('engineStart() Story.getAllInit().forEach');
-				const debugBuffer = Wikifier.wikifyEval(passage.text, passage);
+				const debugBuffer = Wikifier.wikifyEval(passage.text);
 
 				if (Config.debug) {
 					const debugView = new DebugView(
@@ -212,8 +214,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		*/
 		if (Story.has('StoryInit')) {
 			try {
-				console.log('engineStart() Story Execute the StoryInit special passage.');
-				const debugBuffer = Wikifier.wikifyEval(Story.get('StoryInit').text, Story.get('StoryInit'));
+				const debugBuffer = Wikifier.wikifyEval(Story.get('StoryInit').text);
 
 				if (Config.debug) {
 					const debugView = new DebugView(
@@ -419,6 +420,13 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		Go to the moment which directly precedes the active moment and show it.
 	*/
 	function engineBackward() {
+		// prevent going backward into the starting passage
+		if (State.length >= 2) {
+			const prev = State.peek(1);
+			if (prev && prev.title === Config.passages.start) {
+				return false;
+			}
+		}
 		return engineGo(-1);
 	}
 
@@ -444,6 +452,12 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 	function enginePlay(title, noHistory) {
 		if (DEBUG) { console.log(`[Engine/enginePlay(title: "${title}", noHistory: ${noHistory})]`); }
 
+		// Remember current passage and Y scroll
+		const _prevPassageTitle = State.passage;
+		const _savedScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+
+		_flags.noValidLinks = true;
+
 		let passageTitle = title;
 
 		// Update the engine state.
@@ -452,6 +466,9 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		// Reset the temporary state and variables objects.
 		TempState = {}; // eslint-disable-line no-undef
 		State.clearTemporary();
+
+		State.clearLocal();
+		State.pushLocal();
 
 		// Debug view setup.
 		let passageReadyOutput;
@@ -514,7 +531,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		if (Story.has('PassageReady')) {
 			try {
-				passageReadyOutput = Wikifier.wikifyEval(Story.get('PassageReady').text, Story.get('PassageReady'));
+				passageReadyOutput = Wikifier.wikifyEval(Story.get('PassageReady').text);
 			}
 			catch (ex) {
 				console.error(ex);
@@ -561,7 +578,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		// Render the `PassageHeader` passage, if it exists, into the passage element.
 		if (Story.has('PassageHeader')) {
-			new Wikifier(passageEl, Story.get('PassageHeader').processText(), undefined, Story.get('PassageHeader'));
+			new Wikifier(passageEl, Story.get('PassageHeader').processText());
 		}
 
 		// Render the passage into its element.
@@ -569,7 +586,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		// Render the `PassageFooter` passage, if it exists, into the passage element.
 		if (Story.has('PassageFooter')) {
-			new Wikifier(passageEl, Story.get('PassageFooter').processText(), undefined, Story.get('PassageHeader'));
+			new Wikifier(passageEl, Story.get('PassageFooter').processText());
 		}
 
 		// Execute post-render events and tasks.
@@ -651,8 +668,13 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 			document.title = `${passage.title} | ${Story.title}`;
 		}
 
-		// Scroll the window to the top.
-		window.scroll(0, 0);
+		// Restore scroll position if the passage isn't changed
+		if (_prevPassageTitle === passage.title) {
+			requestAnimationFrame(() => window.scrollTo(0, _savedScrollY || 0));
+		}
+		else {
+			window.scroll(0, 0);
+		}
 
 		// Update the engine state.
 		_state = States.Playing;
@@ -660,7 +682,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		// Execute post-display events, tasks, and the `PassageDone` special passage.
 		if (Story.has('PassageDone')) {
 			try {
-				passageDoneOutput = Wikifier.wikifyEval(Story.get('PassageDone').text, Story.get('PassageDone'));
+				passageDoneOutput = Wikifier.wikifyEval(Story.get('PassageDone').text);
 			}
 			catch (ex) {
 				console.error(ex);
@@ -683,7 +705,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		if (_updating !== null) {
 			_updating.forEach(pair => {
 				jQuery(pair.element).empty();
-				new Wikifier(pair.element, Story.get(pair.passage).processText().trim(), undefined, pair.passage);
+				new Wikifier(pair.element, Story.get(pair.passage).processText().trim());
 			});
 		}
 		else if (Config.ui.updateStoryElements) {
@@ -764,6 +786,9 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 			passage
 		});
 
+		// Pop the last frame - just in case.
+		State.popLocal();
+
 		// Reset the engine state.
 		_state = States.Idle;
 
@@ -843,6 +868,7 @@ var Engine = (() => { // eslint-disable-line no-unused-vars, no-var
 		forward     : { value : engineForward },
 		show        : { value : engineShow },
 		play        : { value : enginePlay },
+		flags       : { value : _flags },
 
 		/*
 			Legacy Functions.

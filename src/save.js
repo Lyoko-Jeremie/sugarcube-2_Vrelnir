@@ -545,7 +545,6 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 		return storage.set('saves', saves);
 	}
 
-
 	function _marshal(supplemental, details) {
 		if (DEBUG) { console.log(`[Save/_marshal(…, { type : '${details.type}' })]`); }
 
@@ -565,6 +564,7 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		_onSaveHandlers.forEach(fn => fn(saveObj, details));
 
+		// Delta encode the state history and delete the non-encoded property.
 		saveObj.state.delta = State.deltaEncode(saveObj.state.history);
 		delete saveObj.state.history;
 
@@ -583,30 +583,10 @@ var Save = (() => { // eslint-disable-line no-unused-vars, no-var
 
 			// Delta decode the state history and delete the encoded property.
 			if (!saveObj.state.history) {
-				if (saveObj.state.jdelta) {
-					let corruptionTrigger = false;
-					try {
-						saveObj.state.history = State.jdeltaDecode(saveObj.state.delta, saveObj.state.jdelta);
-						// ensure that decoder didn't screw up
-						if (saveObj.state.history.find(s => typeof s !== 'object')) corruptionTrigger = true;
-					}
-					catch {
-						corruptionTrigger = true;
-					}
-					if (corruptionTrigger) {
-						// eslint-disable-next-line no-alert
-						alert('Corrupted jdelta detected, loading the last known state.');
-						saveObj.state.history = saveObj.state.delta;
-						delete saveObj.state.realIndex;
-					}
-					delete saveObj.state.jdelta;
-				}
-				else if (saveObj.state.delta) {
-					saveObj.state.history = State.deltaDecode(saveObj.state.delta);
-				}
+				if (saveObj.state.jdelta) delete saveObj.state.jdelta;
+				if (saveObj.state.delta) saveObj.state.history = State.deltaDecode(saveObj.state.delta);
 				delete saveObj.state.delta;
 			}
-			if (saveObj.state.realIndex) saveObj.state.index = saveObj.state.realIndex;
 
 			_onLoadHandlers.forEach(fn => fn(saveObj));
 
