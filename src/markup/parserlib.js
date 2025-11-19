@@ -874,6 +874,7 @@
 				.appendTo(el)
 				.get(0);
 			source = Wikifier.helpers.evalPassageId(markup.source);
+			window.modUtils?.fastWrapHtmlImageElement?.(el);
 
 			// Check for image passage transclusion.
 			if (source.slice(0, 5) !== 'data:' && Story.has(source)) {
@@ -1667,6 +1668,7 @@
 							// NOTE: SVG `.href` IDL attribute is read-only,
 							// so set its `href` content attribute instead.
 							el.setAttribute('href', passage.text.trim());
+							window.modUtils?.fastWrapHtmlImageElement?.(el, 'href');
 						}
 					}
 				}
