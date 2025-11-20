@@ -73,6 +73,12 @@ var Macro = (() => { // eslint-disable-line no-unused-vars, no-var
 
 		try {
 			if (typeof def === 'object') {
+				if (def.handler && !def.OriginHandlerPassageQBalance) {
+					/* eslint-disable no-param-reassign */
+					/* eslint-disable no-undef */
+					def.OriginHandlerPassageQBalance = def.handler;
+				}
+
 				// Add the macro definition.
 				//
 				// NOTE: Since `macrosGet()` may return legacy macros, we add the `_MACRO_API`
