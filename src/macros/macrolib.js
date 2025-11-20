@@ -1349,7 +1349,6 @@
 						}
 					});
 
-					window.modUtils?.fastWrapHtmlImageElement?.($image[0]);
 					passage = this.args[0].link;
 				} else {
 					$link.append(document.createTextNode(Wikifier.wikifyEval(this.args[0].text).textContent));
@@ -2128,7 +2127,6 @@
 						// Argument was in wiki image syntax.
 						$image = jQuery(document.createElement('img'))
 							.attr('src', this.args[i].source);
-						window.modUtils?.fastWrapHtmlImageElement?.($image[0]);
 
 						if (this.args[i].hasOwnProperty('passage')) {
 							$image.attr('data-passage', this.args[i].passage);
@@ -2213,7 +2211,6 @@
 						// Argument was in wiki image syntax.
 						$image = jQuery(document.createElement('img'))
 							.attr('src', this.args[0].source);
-						window.modUtils?.fastWrapHtmlImageElement?.($image[0]);
 
 						if (this.args[0].hasOwnProperty('passage')) {
 							$image.attr('data-passage', this.args[0].passage);
@@ -2355,7 +2352,6 @@
 						// Argument was in wiki image syntax.
 						$image = jQuery(document.createElement('img'))
 							.attr('src', this.args[0].source);
-						window.modUtils?.fastWrapHtmlImageElement?.($image[0]);
 
 						if (this.args[0].hasOwnProperty('passage')) {
 							$image.attr('data-passage', this.args[0].passage);
