@@ -38,7 +38,7 @@ jobs:
           node build.js -d -u -b 2
 
       - name: Upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sugarcube-2
           path: ${{ github.workspace }}/build/twine2/sugarcube-2/
