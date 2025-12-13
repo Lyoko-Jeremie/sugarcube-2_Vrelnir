@@ -19,6 +19,8 @@
 const CONFIG = {
 	js : {
 		files : [
+			// sb sugarcube2
+			'locale/chs.js',
 			// The ordering herein is significant.
 			'src/lib/alert.js',
 			'src/lib/patterns.js',
